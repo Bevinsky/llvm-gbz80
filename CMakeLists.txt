@@ -316,6 +316,7 @@ set(LLVM_ALL_TARGETS
   AMDGPU
   ARM
   BPF
+  GBZ80
   Hexagon
   Lanai
   Mips
