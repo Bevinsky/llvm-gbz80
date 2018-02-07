@@ -21,7 +21,8 @@ GBZ80MCAsmInfo::GBZ80MCAsmInfo(const Triple &TT) {
   CodePointerSize = 2;
   CalleeSaveStackSlotSize = 2;
   CommentString = ";";
-  PrivateGlobalPrefix = ".L";
+  PrivateGlobalPrefix = "L";
+  PrivateLabelPrefix = ".L";
   UseIntegratedAssembler = false;
   AsciiDirective = "DB ";
   AscizDirective = nullptr; // DB does not zero-terminate.
@@ -34,6 +35,7 @@ GBZ80MCAsmInfo::GBZ80MCAsmInfo(const Triple &TT) {
   HasDotTypeDotSizeDirective = false;
   HasSingleParameterDotFile = false;
   WeakDirective = nullptr;
+  SupportsDebugInformation = false;
 }
 
 } // end of namespace llvm
