@@ -20,7 +20,10 @@
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/IR/Mangler.h"
+#include "llvm/MC/MCAsmInfo.h"
+#include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
@@ -28,6 +31,7 @@
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetRegisterInfo.h"
+#include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Target/TargetSubtargetInfo.h"
 
 #define DEBUG_TYPE "GBZ80-asm-printer"
@@ -56,8 +60,12 @@ public:
 
   void EmitInstruction(const MachineInstr *MI) override;
 
+  void EmitLinkage(const GlobalValue *GV, MCSymbol *GVSym) const;
+
 private:
   const MCRegisterInfo &MRI;
+
+  void EmitFunctionHeader() override;
 };
 
 void GBZ80AsmPrinter::printOperand(const MachineInstr *MI, unsigned OpNo,
@@ -140,6 +148,90 @@ void GBZ80AsmPrinter::EmitInstruction(const MachineInstr *MI) {
   MCInst I;
   MCInstLowering.lowerInstruction(*MI, I);
   EmitToStreamer(*OutStreamer, I);
+}
+
+void GBZ80AsmPrinter::EmitLinkage(const GlobalValue *GV,
+    MCSymbol *GVSym) const {
+  GlobalValue::LinkageTypes Linkage = GV->getLinkage();
+  switch (Linkage) {
+  case GlobalValue::ExternalLinkage:
+    OutStreamer->EmitSymbolAttribute(GVSym, MCSA_Global);
+    break;
+  case GlobalValue::PrivateLinkage:
+  case GlobalValue::InternalLinkage:
+    // Emit nothing for private and internal.
+    break;
+  case GlobalValue::CommonLinkage:
+  case GlobalValue::LinkOnceAnyLinkage:
+  case GlobalValue::LinkOnceODRLinkage:
+  case GlobalValue::WeakAnyLinkage:
+  case GlobalValue::WeakODRLinkage:
+    llvm_unreachable("Unsupported linkage types!");
+  case GlobalValue::AppendingLinkage:
+  case GlobalValue::AvailableExternallyLinkage:
+  case GlobalValue::ExternalWeakLinkage:
+    llvm_unreachable("Should never emit this");
+  }
+}
+
+void GBZ80AsmPrinter::EmitFunctionHeader() {
+  const Function *F = MF->getFunction();
+
+  if (isVerbose())
+    OutStreamer->GetCommentOS()
+    << "-- Begin function "
+    << GlobalValue::dropLLVMManglingEscape(F->getName()) << '\n';
+
+  // Print out constants referenced by the function
+  EmitConstantPool();
+
+  // Print the 'header' of function.
+  OutStreamer->SwitchSection(getObjFileLowering().SectionForGlobal(F, TM));
+
+  EmitLinkage(F, CurrentFnSym);
+
+  if (isVerbose()) {
+    F->printAsOperand(OutStreamer->GetCommentOS(),
+      /*PrintType=*/false, F->getParent());
+    OutStreamer->GetCommentOS() << '\n';
+  }
+
+  // Emit the prefix data.
+  if (F->hasPrefixData()) {
+    if (MAI->hasSubsectionsViaSymbols()) {
+      // Preserving prefix data on platforms which use subsections-via-symbols
+      // is a bit tricky. Here we introduce a symbol for the prefix data
+      // and use the .alt_entry attribute to mark the function's real entry point
+      // as an alternative entry point to the prefix-data symbol.
+      MCSymbol *PrefixSym = OutContext.createLinkerPrivateTempSymbol();
+      OutStreamer->EmitLabel(PrefixSym);
+
+      EmitGlobalConstant(F->getParent()->getDataLayout(), F->getPrefixData());
+
+      // Emit an .alt_entry directive for the actual function symbol.
+      OutStreamer->EmitSymbolAttribute(CurrentFnSym, MCSA_AltEntry);
+    } else {
+      EmitGlobalConstant(F->getParent()->getDataLayout(), F->getPrefixData());
+    }
+  }
+
+  // Emit the CurrentFnSym.  This is a virtual function to allow targets to
+  // do their wild and crazy things as required.
+  EmitFunctionEntryLabel();
+
+  // If the function had address-taken blocks that got deleted, then we have
+  // references to the dangling symbols.  Emit them at the start of the function
+  // so that we don't get references to undefined symbols.
+  std::vector<MCSymbol*> DeadBlockSyms;
+  MMI->takeDeletedSymbolsForFunction(F, DeadBlockSyms);
+  for (unsigned i = 0, e = DeadBlockSyms.size(); i != e; ++i) {
+    OutStreamer->AddComment("Address taken block that was later removed");
+    OutStreamer->EmitLabel(DeadBlockSyms[i]);
+  }
+
+  // Emit the prologue data.
+  if (F->hasPrologueData())
+    EmitGlobalConstant(F->getParent()->getDataLayout(), F->getPrologueData());
 }
 
 } // end of namespace llvm
