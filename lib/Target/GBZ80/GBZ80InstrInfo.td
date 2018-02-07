@@ -817,11 +817,11 @@ let isBranch = 1, isTerminator = 1 in {
   let isBarrier = 1 in {
     def JP_nn : I24<(outs), (ins brtarget16:$targ),
       "JP\t$targ",
-      [(br bb:$targ)]>;
+      []>;
 
     def JR_e : I16<(outs), (ins relbrtarget8:$targ),
       "JR\t$targ",
-      []>;
+      [(br bb:$targ)]>;
 
     // indirectbr? Should this have a real input instead of an impdef?
     // nah
@@ -835,12 +835,12 @@ let isBranch = 1, isTerminator = 1 in {
   let Uses = [rF] in
   def JP_cc_nn : I24<(outs), (ins brtarget16:$targ, condcode:$cc),
     "JP\t$cc, $targ",
-    [(GBZ80brcond bb:$targ, condcode:$cc)]>;
+    []>;
   
   let Uses = [rF] in
   def JR_cc_e : I16<(outs), (ins relbrtarget8:$targ, condcode:$cc),
     "JR\t$cc, $targ",
-    []>;
+    [(GBZ80brcond bb:$targ, condcode:$cc)]>;
 
   // Pseudo compare+jump for i16. Expand after isel.
   def BR16 : Pseudo<(outs), (ins brtarget16:$targ, condcode:$cc, Pairs:$lhs, Pairs:$rhs),
