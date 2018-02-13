@@ -6,9 +6,8 @@ Also need hooks to detect users of flags as well.
 
 Add commutability to the relevant instructions.
 
-Rematerialization of the simpler instructions (LD n, LD nn)
-If remat doesn't sink those into branch blocks then we need to do that
-ourselves.
+Rematerialization of the simpler instructions (LD n, LD nn). If remat doesn't
+sink those into branch blocks then we need to do that ourselves.
 
 ## Optimizations
 
@@ -49,6 +48,7 @@ ZEXT C -> BC
 LD B, 0
 ```
 ---
+```
 LD R, [XY]
     LD R, [HL]
     (1, 2)
@@ -84,6 +84,7 @@ LD [XY+-], R
     LD [BC/DE], A
     INC/DEC BC/DE
     (3, 5)
+```
 ---
 
 

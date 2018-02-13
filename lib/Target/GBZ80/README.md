@@ -8,4 +8,4 @@ TODO?
 
 ## Useful links
 
-[https://github.com/avivace/awesome-gbdev](GBdev Awesome list)
+[GBdev Awesome List](https://github.com/avivace/awesome-gbdev)
