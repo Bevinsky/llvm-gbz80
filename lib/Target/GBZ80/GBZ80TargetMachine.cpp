@@ -80,9 +80,10 @@ extern "C" void LLVMInitializeGBZ80Target() {
   RegisterTargetMachine<GBZ80TargetMachine> X(getTheGBZ80Target());
 
   auto &PR = *PassRegistry::getPassRegistry();
-  initializeGBZ80ExpandPseudoPass(PR);
-  initializeGBZ80InstrumentFunctionsPass(PR);
-  initializeGBZ80RelaxMemPass(PR);
+  initializeGBZ80PostISelPass(PR);
+  initializeGBZ80PreRAPass(PR);
+  initializeGBZ80PostRAPass(PR);
+  initializeGBZ80PreEmitPass(PR);
 }
 
 const GBZ80Subtarget *GBZ80TargetMachine::getSubtargetImpl() const {
@@ -100,24 +101,21 @@ const GBZ80Subtarget *GBZ80TargetMachine::getSubtargetImpl(const Function &) con
 bool GBZ80PassConfig::addInstSelector() {
   // Install an instruction selector.
   addPass(createGBZ80ISelDag(getGBZ80TargetMachine(), getOptLevel()));
-  // Create the frame analyzer pass used by the PEI pass.
- // addPass(createGBZ80FrameAnalyzerPass());
+  addPass(createGBZ80PostISelPass());
 
   return false;
 }
 
 void GBZ80PassConfig::addPreRegAlloc() {
-  // Create the dynalloc SP save/restore pass to handle variable sized allocas.
-  //addPass(createGBZ80DynAllocaSRPass());
+  addPass(createGBZ80PreRAPass());
 }
 
 void GBZ80PassConfig::addPreSched2() {
-  //addPass(createGBZ80RelaxMemPass());
-  //addPass(createGBZ80ExpandPseudoPass());
+  addPass(createGBZ80PostRAPass());
 }
 
 void GBZ80PassConfig::addPreEmitPass() {
-  // Must run branch selection immediately preceding the asm printer.
+  addPass(createGBZ80PreEmitPass());
   addPass(&BranchRelaxationPassID);
 }
 

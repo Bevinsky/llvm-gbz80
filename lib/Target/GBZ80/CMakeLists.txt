@@ -14,14 +14,15 @@ add_public_tablegen_target(GBZ80CommonTableGen)
 
 add_llvm_target(GBZ80CodeGen
   GBZ80AsmPrinter.cpp
-  GBZ80ExpandPseudoInsts.cpp
   GBZ80FrameLowering.cpp
   GBZ80InstrInfo.cpp
-  GBZ80InstrumentFunctions.cpp
   GBZ80ISelDAGToDAG.cpp
   GBZ80ISelLowering.cpp
   GBZ80MCInstLower.cpp
-  GBZ80RelaxMemOperations.cpp
+  GBZ80PostISel.cpp
+  GBZ80PreRA.cpp
+  GBZ80PostRA.cpp
+  GBZ80PreEmit.cpp
   GBZ80RegisterInfo.cpp
   GBZ80Subtarget.cpp
   GBZ80TargetMachine.cpp
