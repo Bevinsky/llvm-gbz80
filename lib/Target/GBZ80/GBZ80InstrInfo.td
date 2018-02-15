@@ -103,11 +103,22 @@ def imm0_63_neg : PatLeaf<(imm),
   return val >= 0 && val < 64;
 }], imm16_neg_XFORM>;
 
-def uimm3 : PatLeaf<(imm), [{ return isUInt<3>(N->getZExtValue()); }]>, Operand<i8>;
-def imm8 : PatLeaf<(imm), [{ return isUInt<8>(N->getZExtValue()) || isInt<8>(N->getSExtValue()); }]>, Operand<i8>;
+let PrintMethod = "printUImm8" in {
+  def uimm3 : PatLeaf<(imm), [{ return isUInt<3>(N->getZExtValue()); }]>,
+              Operand<i8>;
+  def imm8 : PatLeaf<(imm), [{ return isUInt<8>(N->getZExtValue()) ||
+                                      isInt<8>(N->getSExtValue()); }]>,
+             Operand<i8>;
+}
 def simm8 : PatLeaf<(imm), [{ return isInt<8>(N->getSExtValue()); }]>, Operand<i8>;
-def uimm16 : PatLeaf<(imm), [{ return isUInt<16>(N->getZExtValue()); }]>, Operand<i16>;
-def imm16 : PatLeaf<(imm), [{ return isUInt<16>(N->getZExtValue()) || isInt<16>(N->getSExtValue()); }]>, Operand<i16>;
+
+let PrintMethod = "printUImm16" in {
+  def uimm16 : PatLeaf<(imm), [{ return isUInt<16>(N->getZExtValue()); }]>,
+               Operand<i16>;
+  def imm16 : PatLeaf<(imm), [{ return isUInt<16>(N->getZExtValue()) ||
+                                       isInt<16>(N->getSExtValue()); }]>,
+              Operand<i16>;
+}
 
 def uimm8p2_XFORM : SDNodeXForm<imm,
 [{

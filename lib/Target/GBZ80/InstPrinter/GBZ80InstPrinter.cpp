@@ -68,6 +68,21 @@ void GBZ80InstPrinter::printCondCode(const MCInst *MI, unsigned OpNo,
   }
 }
 
+void GBZ80InstPrinter::printUImm8(const MCInst *MI, unsigned OpNo,
+                                  raw_ostream &O) {
+  assert(MI->getOperand(OpNo).isImm() && "Not an imm8?");
+  O << format("$%02X", (uint8_t)(uint64_t)MI->getOperand(OpNo).getImm());
+}
+void GBZ80InstPrinter::printUImm16(const MCInst *MI, unsigned OpNo,
+                                   raw_ostream &O) {
+  if (MI->getOperand(OpNo).isImm())
+    O << format("$%04X", (uint16_t)(uint64_t)MI->getOperand(OpNo).getImm());
+  else {
+    assert(MI->getOperand(OpNo).isExpr());
+    O << MI->getOperand(OpNo).getExpr();
+  }
+}
+
 void GBZ80InstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
                                   raw_ostream &O) {
   const MCOperand &Op = MI->getOperand(OpNo);
