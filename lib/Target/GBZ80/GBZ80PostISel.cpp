@@ -42,24 +42,53 @@ public:
   StringRef getPassName() const override { return PASS_NAME; }
 
 private:
-  typedef MachineBasicBlock Block;
-  typedef Block::iterator BlockIt;
-
   const GBZ80RegisterInfo *TRI;
   const TargetInstrInfo *TII;
   MachineRegisterInfo *MRI;
+
+  MachineFunction *MF;
+
+  bool expandBranch16();
+  bool optimizeCP();
 
 };
 
 char GBZ80PostISel::ID = 0;
 
 
+bool GBZ80PostISel::optimizeCP() {
+  bool Modified = false;
+
+
+  return Modified;
+}
+
+bool GBZ80PostISel::expandBranch16() {
+  bool Modified = false;
+
+  // Expand BR16
+
+
+  return Modified;
+}
+
 bool GBZ80PostISel::runOnMachineFunction(MachineFunction &MF) {
   bool Modified = false;
 
+  this->MF = &MF;
   const GBZ80Subtarget &STI = MF.getSubtarget<GBZ80Subtarget>();
   TRI = STI.getRegisterInfo();
   TII = STI.getInstrInfo();
+  MRI = &MF.getRegInfo();
+
+  // Expand branch and select pseudos:
+  //  * BR16
+  //  * Select16_8
+  //  * Select16_16
+  Modified |= expandBranch16();
+
+  // Optimize compares by swapping operands.
+  Modified |= optimizeCP();
 
   return Modified;
 }
