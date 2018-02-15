@@ -105,10 +105,10 @@ GBZ80TargetLowering::GBZ80TargetLowering(GBZ80TargetMachine &tm)
 
   // Add support for postincrement and predecrement load/stores.
 
-  setIndexedLoadAction(ISD::POST_INC, MVT::i8, Legal);
-  setIndexedStoreAction(ISD::POST_INC, MVT::i8, Legal);
-  setIndexedLoadAction(ISD::POST_DEC, MVT::i8, Legal);
-  setIndexedStoreAction(ISD::POST_DEC, MVT::i8, Legal);
+  //setIndexedLoadAction(ISD::POST_INC, MVT::i8, Legal);
+  //setIndexedStoreAction(ISD::POST_INC, MVT::i8, Legal);
+  //setIndexedLoadAction(ISD::POST_DEC, MVT::i8, Legal);
+  //setIndexedStoreAction(ISD::POST_DEC, MVT::i8, Legal);
   //setIndexedLoadAction(ISD::POST_INC, MVT::i16, Legal);
   //setIndexedLoadAction(ISD::PRE_DEC, MVT::i8, Legal);
   //setIndexedLoadAction(ISD::PRE_DEC, MVT::i16, Legal);
