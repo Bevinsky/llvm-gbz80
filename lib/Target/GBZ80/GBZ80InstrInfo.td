@@ -937,13 +937,54 @@ let isReturn = 1, isTerminator = 1 in {
     []>;
 }
 
+///===============================
+/// Other instructions
+///===============================
 
+let Defs = [rF], Uses = [rF], Constraints = "$dst = $src" in
+def DAA : I8<(outs AReg:$dst), (ins AReg:$src),
+  "DAA",
+  []>;
 
+let Defs = [rF], Constraints = "$dst = $src" in
+def CPL : I8<(outs AReg:$dst), (ins AReg:$src),
+  "CPL",
+  [(set i8:$dst, (not i8:$src))]>;
 
+// It does nothing
+def NOP : I8<(outs), (ins),
+  "NOP",
+  []>;
 
+let Defs = [rF], Uses = [rF] in
+def CCF : I8<(outs), (ins),
+  "CCF",
+  []>;
 
+let Defs = [rF] in
+def SCF : I8<(outs), (ins),
+  "SCF",
+  []>;
 
+let Defs = [IME], Uses = [IME], hasSideEffects = 1 in {
+  def DI : I8<(outs), (ins),
+    "DI",
+    []>;
 
+  def EI : I8<(outs), (ins),
+    "EI",
+    []>;
+}
+
+let hasSideEffects = 1 in {
+  def HALT : I8<(outs), (ins),
+    "HALT",
+    []>;
+
+  def STOP : I8<(outs), (ins),
+    "STOP",
+    []>;
+}
 
 ///===============================
 /// Patterns
