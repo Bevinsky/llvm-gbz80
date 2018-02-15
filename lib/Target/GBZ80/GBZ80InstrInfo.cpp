@@ -252,7 +252,7 @@ void GBZ80InstrInfo::reMaterialize(MachineBasicBlock &MBB,
   MachineBasicBlock::iterator MI, unsigned DestReg,
   unsigned SubIdx, const MachineInstr &Orig,
   const TargetRegisterInfo &TRI) const {
-
+  assert(false);
 }
 
 bool GBZ80InstrInfo::analyzeBranch(MachineBasicBlock &MBB,

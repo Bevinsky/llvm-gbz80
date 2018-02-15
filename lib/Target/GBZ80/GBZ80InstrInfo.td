@@ -176,7 +176,7 @@ def HRAMImmAddr : PatLeaf<(imm),
 def iaddr : ComplexPattern<i16, 1, "SelectIAddr", [], []>; 
 
 // Match for HRAM indirect reg. e.g. LD [$FF00+C]
-def HRAMRegAddr : ComplexPattern<iPTR, 1, "SelectHRAMRegAddr", [add], [SDNPWantRoot]>;
+//def HRAMRegAddr : ComplexPattern<iPTR, 1, "SelectHRAMRegAddr", [add], [SDNPWantRoot]>;
 
 //===----------------------------------------------------------------------===//
 // GBZ80 predicates for subtarget features
@@ -250,11 +250,11 @@ let mayLoad = 1 in {
     [(set i8:$dst, (load i16:$ptr))]>;
 
   let Constraints = "$ptr = $post" in {
-    def LD8_INC : Pseudo<(outs GPR8:$dst, Pairs:$post), (ins Pairs:$ptr),
+    def LD8_INC : Pseudo<(outs AReg:$dst, Pairs:$post), (ins Pairs:$ptr),
       "LD8\t$dst, [$ptr+]",
       []>;
 
-    def LD8_DEC : Pseudo<(outs GPR8:$dst, Pairs:$post), (ins Pairs:$ptr),
+    def LD8_DEC : Pseudo<(outs AReg:$dst, Pairs:$post), (ins Pairs:$ptr),
       "LD8\t$dst, [$ptr-]",
       []>;
   }
@@ -275,7 +275,7 @@ def LD_A_dd : I8<(outs AReg:$dst), (ins BCDEPairs:$ptr),
 let mayLoad = 1 in
 def LDH_A_C : I8<(outs AReg:$dst), (ins CReg:$reg),
   "LD\t$dst, [$$FF00+C]",
-  [(set AReg:$dst, (load HRAMRegAddr:$reg))]>;
+  []>;
 
 let mayLoad = 1 in
 def LDH_A_n : I16<(outs AReg:$dst), (ins imm8:$offs),
@@ -310,11 +310,11 @@ let mayStore = 1 in {
     [(store i8:$src, i16:$ptr)]>;
 
   let Constraints = "$ptr = $post" in {
-    def ST8_INC : Pseudo<(outs Pairs:$post), (ins GPR8:$src, Pairs:$ptr),
+    def ST8_INC : Pseudo<(outs Pairs:$post), (ins AReg:$src, Pairs:$ptr),
       "ST8\t[$ptr+], $src",
       []>;
 
-    def ST8_DEC : Pseudo<(outs Pairs:$post), (ins GPR8:$src, Pairs:$ptr),
+    def ST8_DEC : Pseudo<(outs Pairs:$post), (ins AReg:$src, Pairs:$ptr),
       "ST8\t[$ptr-], $src",
       []>;
   }
@@ -334,7 +334,7 @@ def LD_HL_n : I16<(outs), (ins imm8:$imm, HLPairs:$ptr),
 let mayStore = 1 in
 def LDH_C_A : I8<(outs), (ins AReg:$src, CReg:$reg),
   "LD\t[$$FF00+C], A",
-  [(store AReg:$src, HRAMRegAddr:$reg)]>;
+  []>;
 
 let mayStore = 1 in
 def LDH_n_A : I16<(outs), (ins AReg:$src, imm8:$offs),
@@ -349,7 +349,7 @@ def LD_nn_A : I24<(outs), (ins AReg:$src, uimm16:$addr),
 let mayStore = 1 in
 def LD_dd_A : I8<(outs), (ins AReg:$src, BCDEPairs:$ptr),
   "LD\t[$ptr], A",
-  [(store AReg:$src, BCDEPairs:$ptr)]>;
+  []>;
 
 let Uses = [SP], mayStore = 1 in
 def LD_nn_SP : I24<(outs), (ins uimm16:$addr),
@@ -963,3 +963,5 @@ def : Pat<(store i8:$src, (i16 (AVRWrapper tglobaladdr:$dst))),
 def : Pat<(store i16:$src, (i16 (AVRWrapper tglobaladdr:$dst))),
           (STSWKRr tglobaladdr:$dst, i16:$src)>;
 */
+
+// Add patterns for LDH_C_A and LDH_A_C.
