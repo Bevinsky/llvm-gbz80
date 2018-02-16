@@ -161,23 +161,21 @@ bool GBZ80PreRA::combinePostIncMemAccs() {
       //  %dst, %post = LD8_INC %ptr
       // and replace all IncDef with %post.
       unsigned opc;
-      MachineInstr *NewMI;
-      if (MemMI.getOpcode() == GB::LD8) {
+      if (MemMI.mayLoad())
         opc = IncMI->getOpcode() == GB::INC_ss ? GB::LD8_INC : GB::LD8_DEC;
-        // The load def cannot be a subreg due to AReg.
-        NewMI =
-          BuildMI(*MBBI, MemMI, DebugLoc(), TII->get(opc),
-            MemMI.getOperand(0).getReg())
-          .addReg(IncDef, RegState::Define)
-          .addReg(PtrReg);
-      } else {
+      else
         opc = IncMI->getOpcode() == GB::INC_ss ? GB::ST8_INC : GB::ST8_DEC;
-        NewMI =
-          BuildMI(*MBBI, MemMI, DebugLoc(), TII->get(opc),
-            IncDef)
-          .addReg(MemMI.getOperand(0).getReg())
-          .addReg(PtrReg);
-      }
+      auto Builder = BuildMI(*MBBI, MemMI, DebugLoc(), TII->get(opc));
+      if (MemMI.mayLoad())
+        Builder.addReg(MemMI.getOperand(0).getReg(), RegState::Define)
+        .addReg(IncDef, RegState::Define);
+      else
+        Builder.addReg(IncDef, RegState::Define)
+        .addReg(MemMI.getOperand(0).getReg());
+      Builder.addReg(PtrReg);
+      for (auto &MMO : MemMI.memoperands())
+        Builder.addMemOperand(MMO);
+
       MemMI.eraseFromParent();
       IncMI->eraseFromBundle();
       MII = MBBI->begin();
