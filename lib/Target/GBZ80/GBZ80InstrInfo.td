@@ -400,8 +400,10 @@ let Defs = [SP], Uses = [SP] in {
 ///   OP8i
 ///   OP16r
 ///   OP16i
-multiclass ALUOp<string Name, SDNode MatchOp, list<Register> ExtraUses = []> {
+multiclass ALUOp<string Name, SDNode MatchOp, list<Register> ExtraUses = [],
+                 bit IsComm = 0> {
   let Uses = ExtraUses, Defs = [rF], Constraints = "$dst = $a" in {
+    let isCommutable = IsComm in
     def _r : I8<(outs AReg:$dst), (ins AReg:$a, GPR8:$src),
       !strconcat(Name, "\tA, $src"),
       [(set AReg:$dst, (MatchOp AReg:$a, GPR8:$src))]>;
@@ -425,13 +427,13 @@ multiclass ALUOp<string Name, SDNode MatchOp, list<Register> ExtraUses = []> {
   }
 }
 
-defm ADD : ALUOp<"ADD", add>;
-defm ADC : ALUOp<"ADC", adde, [rF]>;
+defm ADD : ALUOp<"ADD", add,  [],   1>;
+defm ADC : ALUOp<"ADC", adde, [rF], 1>;
 defm SUB : ALUOp<"SUB", sub>;
 defm SBC : ALUOp<"SBC", sube, [rF]>;
-defm AND : ALUOp<"AND", and>;
-defm OR  : ALUOp<"OR", or>;
-defm XOR : ALUOp<"XOR", xor>;
+defm AND : ALUOp<"AND", and,  [],   1>;
+defm OR  : ALUOp<"OR", or,    [],   1>;
+defm XOR : ALUOp<"XOR", xor,  [],   1>;
 
 // TODO: Make pseudos for cp when the format is decided.
 let Defs = [rF] in {
