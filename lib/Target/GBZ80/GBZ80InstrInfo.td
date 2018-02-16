@@ -904,7 +904,7 @@ let isCall = 1 in {
   let Uses = [SP, IME], Defs = [IME, rA, rF, rAF, rH, rL, rHL] in 
   def CALL_nn : I24<(outs), (ins calltarget:$targ),
     "CALL\t$targ",
-    []>;
+    [(GBZ80call imm:$targ)]>;
   
   let Uses = [SP, IME, rF], Defs = [IME, rA, rF, rAF, rH, rL, rHL] in
   def CALL_cc_nn : I24<(outs), (ins calltarget:$targ, condcode:$cc),
@@ -992,6 +992,11 @@ let hasSideEffects = 1 in {
 
 def : Pat<(i16 (GBZ80Wrapper tglobaladdr:$dst)),
           (LD_dd_nn tglobaladdr:$dst)>;
+
+def : Pat<(GBZ80call (i16 tglobaladdr:$dst)),
+          (CALL_nn tglobaladdr:$dst)>;
+def : Pat<(GBZ80call (i16 texternalsym:$dst)),
+          (CALL_nn texternalsym:$dst)>;
 /*
 def : Pat<(add i16:$src, (AVRWrapper tglobaladdr:$src2)),
           (ADD16r i16:$src, tglobaladdr:$src2)>;

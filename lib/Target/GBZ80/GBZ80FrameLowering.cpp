@@ -270,7 +270,7 @@ MachineBasicBlock::iterator GBZ80FrameLowering::eliminateCallFramePseudoInstr(
   DebugLoc DL = MI->getDebugLoc();
   unsigned int Opcode = MI->getOpcode();
   int Amount = TII.getFrameSize(*MI);
-  assert(false && "unimplemented");
+  assert(Amount == 0 && "call frame with stack not yet implemented!");
 #if 0
   // Adjcallstackup does not need to allocate stack space for the call, instead
   // we insert push instructions that will allocate the necessary stack.
