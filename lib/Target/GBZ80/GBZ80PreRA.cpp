@@ -59,11 +59,48 @@ private:
   MachineDominatorTree *DT;
 
   bool combinePostIncMemAccs();
+  bool widenConstrainedRegClasses();
 
 };
 
 char GBZ80PreRA::ID = 0;
 
+
+// Insert extra copies from constrained regclasses (like AReg and HLPairs) to
+// make it easier for the register allocator to avoid spills.
+bool GBZ80PreRA::widenConstrainedRegClasses() {
+  bool Modified = false;
+
+  for (auto &MBB : *MF) {
+    for (auto MII = MBB.begin(); MII != MBB.end(); ++MII) {
+      if (!MII->isCopy())
+        continue;
+      if (!TRI->isPhysicalRegister(MII->getOperand(1).getReg()))
+        continue;
+      unsigned DefReg = MII->getOperand(0).getReg();
+      if (!TRI->isVirtualRegister(DefReg))
+        continue;
+      const TargetRegisterClass *DefRC = MRI->getRegClass(DefReg);
+      const TargetRegisterClass *NewRC = TRI->getCrossCopyRegClass(DefRC);
+      if (NewRC == DefRC)
+        continue;
+
+      // We can widen this regclass. Just replace the reg with a new vreg of
+      // a larger regclass and insert a copy to the old reg.
+      // XXX: What if the orig is a Pair with subreg? Could it get messy?
+      // FIXME: Is there a benefit to skipping the copy if all uses are not
+      // also regclass-constrained?
+      unsigned NewReg = MRI->createVirtualRegister(NewRC);
+      MII->getOperand(0).setReg(NewReg);
+      auto NextMI = MII->getNextNode();
+      MII = BuildMI(MBB, NextMI, DebugLoc(), TII->get(GB::COPY), DefReg)
+        .addReg(NewReg);
+      Modified = true;
+    }
+  }
+
+  return Modified;
+}
 
 // TODO: this would be better if we could trace identical vregs through copy.
 /// Returns true if MI dominates all the uses of Reg.
@@ -163,6 +200,9 @@ bool GBZ80PreRA::runOnMachineFunction(MachineFunction &MF) {
 
   // Combine LD8/ST8 with INC/DEC to form LD/ST_INC/DEC.
   Modified |= combinePostIncMemAccs();
+
+  // Widen constrained regclasses.
+  Modified |= widenConstrainedRegClasses();
 
   return Modified;
 }

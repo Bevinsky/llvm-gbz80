@@ -163,6 +163,15 @@ GBZ80RegisterInfo::getPointerRegClass(const MachineFunction &MF,
   return &GB::PairsRegClass;
 }
 
+const TargetRegisterClass *
+GBZ80RegisterInfo::getCrossCopyRegClass(const TargetRegisterClass *RC) const {
+  if (RC == &GB::ARegRegClass || RC == &GB::CRegRegClass)
+    return &GB::GPR8RegClass;
+  else if (RC == &GB::HLPairsRegClass || RC == &GB::BCDEPairsRegClass)
+    return &GB::PairsRegClass;
+  return RC;
+}
+
 void GBZ80RegisterInfo::splitReg(unsigned Reg,
                                unsigned &LoReg,
                                unsigned &HiReg) const {

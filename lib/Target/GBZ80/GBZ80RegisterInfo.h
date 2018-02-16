@@ -47,7 +47,8 @@ public:
   const TargetRegisterClass *
   getPointerRegClass(const MachineFunction &MF,
                      unsigned Kind = 0) const override;
-
+  const TargetRegisterClass *
+    getCrossCopyRegClass(const TargetRegisterClass *RC) const;
   /// Splits a 16-bit `DREGS` register into the lo/hi register pair.
   /// \param Reg A 16-bit register to split.
   void splitReg(unsigned Reg, unsigned &LoReg, unsigned &HiReg) const;
