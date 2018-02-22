@@ -282,11 +282,10 @@ def LDH_A_n : I16<(outs AReg:$dst), (ins imm8:$offs),
   "LDH\tA, [$$FF00+$offs]",
   [(set AReg:$dst, (load HRAMImmAddr:$offs))]>;
 
-// XXX: Can this take a global? verify
 let mayLoad = 1 in
 def LD_A_nn : I24<(outs AReg:$dst), (ins uimm16:$addr),
   "LD\tA, [$addr]",
-  []>;
+  [(set AReg:$dst, (load imm:$addr))]>;
 
 let Constraints = "$ptr = $post", mayLoad = 1 in {
   def LD_A_HLI : I8<(outs AReg:$dst, HLPairs:$post), (ins HLPairs:$ptr),
@@ -344,7 +343,7 @@ def LDH_n_A : I16<(outs), (ins AReg:$src, imm8:$offs),
 let mayStore = 1 in
 def LD_nn_A : I24<(outs), (ins AReg:$src, uimm16:$addr),
   "LD\t[$addr], A",
-  []>;
+  [(store AReg:$src, imm:$addr)]>;
 
 let mayStore = 1 in
 def LD_dd_A : I8<(outs), (ins AReg:$src, BCDEPairs:$ptr),
@@ -999,6 +998,17 @@ def : Pat<(GBZ80call (i16 tglobaladdr:$dst)),
           (CALL_nn tglobaladdr:$dst)>;
 def : Pat<(GBZ80call (i16 texternalsym:$dst)),
           (CALL_nn texternalsym:$dst)>;
+
+def : Pat<(store i8:$src, (GBZ80Wrapper tglobaladdr:$addr)),
+          (LD_nn_A $src, $addr)>;
+def : Pat<(store i8:$src, (GBZ80Wrapper texternalsym:$addr)),
+          (LD_nn_A $src, $addr)>;
+
+def : Pat<(i8 (load (GBZ80Wrapper tglobaladdr:$addr))),
+          (LD_A_nn $addr)>;
+def : Pat<(i8 (load (GBZ80Wrapper texternalsym:$addr))),
+          (LD_A_nn $addr)>;
+
 /*
 def : Pat<(add i16:$src, (AVRWrapper tglobaladdr:$src2)),
           (ADD16r i16:$src, tglobaladdr:$src2)>;
