@@ -802,7 +802,7 @@ static void analyzeStandardArguments(TargetLowering::CallLoweringInfo *CLI,
   static const MCPhysReg RegList8[] =
   { GB::rA, GB::rB, GB::rC, GB::rD, GB::rE, GB::rH, GB::rL };
   static const MCPhysReg RegList16[] =
-  { GB::rHL, GB::rBC, GB::rDE };
+  { GB::rBC, GB::rHL, GB::rDE };
   if (IsVarArg) {
     // Variadic functions do not need all the analisys below.
     if (IsCall) {

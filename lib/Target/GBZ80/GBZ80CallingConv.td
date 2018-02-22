@@ -15,22 +15,16 @@
 
 def RetCC_GBZ80 : CallingConv
 <[
-  // i8 is returned in A.
-  CCIfType<[i8], CCAssignToReg<[rA]>>,
+  // i8 is returned in B.
+  CCIfType<[i8], CCAssignToReg<[rB]>>,
 
-  // i16 are returned in HL.
-  CCIfType<[i16], CCAssignToReg<[rHL]>>
+  // i16 are returned in BC.
+  CCIfType<[i16], CCAssignToReg<[rBC]>>
 ]>;
 
 //===----------------------------------------------------------------------===//
 // GBZ80 Argument Calling Conventions
 //===----------------------------------------------------------------------===//
-
-def ArgCC_GBZ80 : CallingConv<[
-  CCIfType<[i8], CCAssignToReg<[rA, rB, rC, rD, rE, rH, rL]>>,
-  CCIfType<[i16], CCAssignToReg<[rBC, rDE, rHL]>>,
-  CCAssignToStack<2, 1>
-]>;
 
 // Calling convention for variadic functions.
 def ArgCC_GBZ80_Vararg : CallingConv
@@ -43,5 +37,5 @@ def ArgCC_GBZ80_Vararg : CallingConv
 // Callee-saved register lists.
 //===----------------------------------------------------------------------===//
 
-def CSR_Normal : CalleeSavedRegs<(add rBC, rDE)>;
+def CSR_Normal : CalleeSavedRegs<(add rDE, rHL)>;
 def CSR_Interrupts : CalleeSavedRegs<(add rAF, rBC, rDE, rHL)>;

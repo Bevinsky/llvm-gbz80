@@ -903,7 +903,7 @@ def Select8_16 : Pseudo<
 ///===============================
 
 let isCall = 1 in {
-  let Uses = [SP, IME], Defs = [IME, rA, rF, rAF, rH, rL, rHL] in 
+  let Uses = [SP, IME], Defs = [IME, rA, rF, rAF, rB, rC, rBC] in
   def CALL_nn : I24<(outs), (ins calltarget:$targ),
     "CALL\t$targ",
     [(GBZ80call imm:$targ)]>;
