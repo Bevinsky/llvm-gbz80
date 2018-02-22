@@ -79,7 +79,7 @@ void GBZ80InstPrinter::printUImm16(const MCInst *MI, unsigned OpNo,
     O << format("$%04X", (uint16_t)(uint64_t)MI->getOperand(OpNo).getImm());
   else {
     assert(MI->getOperand(OpNo).isExpr());
-    O << MI->getOperand(OpNo).getExpr();
+    O << *MI->getOperand(OpNo).getExpr();
   }
 }
 
