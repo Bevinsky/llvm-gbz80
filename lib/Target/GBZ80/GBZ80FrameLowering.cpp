@@ -37,7 +37,8 @@ bool GBZ80FrameLowering::canSimplifyCallFramePseudos(
     const MachineFunction &MF) const {
   // We cannot simplify, because we do not have a frame pointer and the
   // stack pointer might change between the call pseudos.
-  return false;
+  // ...although, if this isn't true, PEI won't actually remove the pseudos.
+  return true;
 }
 
 bool GBZ80FrameLowering::noFramePointerElim(const MachineFunction &MF) const {
