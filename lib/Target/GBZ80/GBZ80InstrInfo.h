@@ -131,6 +131,8 @@ public:
   bool isBranchOffsetInRange(unsigned BranchOpc,
                              int64_t BrOffset) const override;
 
+  int getSPAdjust(const MachineInstr &MI) const override;
+
   unsigned insertIndirectBranch(MachineBasicBlock &MBB,
                                 MachineBasicBlock &NewDestBB,
                                 const DebugLoc &DL,

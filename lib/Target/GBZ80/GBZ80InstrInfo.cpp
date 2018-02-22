@@ -575,6 +575,18 @@ bool GBZ80InstrInfo::isBranchOffsetInRange(unsigned BranchOp,
   }
 }
 
+int GBZ80InstrInfo::getSPAdjust(const MachineInstr &MI) const {
+  switch (MI.getOpcode()) {
+  case GB::PUSH:
+    return -2;
+  case GB::POP:
+    return 2;
+  case GB::ADD_SP_e:
+    return (int8_t)MI.getOperand(0).getImm();
+  }
+  return TargetInstrInfo::getSPAdjust(MI);
+}
+
 unsigned GBZ80InstrInfo::insertIndirectBranch(MachineBasicBlock &MBB,
   MachineBasicBlock &NewDestBB,
   const DebugLoc &DL,
