@@ -131,7 +131,7 @@ MachineInstr *GBZ80PostRA::expand8BitLDST(MachineInstr &MI) {
   else {
     if (isPostOpc && !PostPtrDead)
       Builder.addReg(PostPtrReg, RegState::Define);
-    Builder.addReg(ValueReg, getDefRegState(isStore));
+    Builder.addReg(ValueReg, getDefRegState(!isStore));
   }
   // Don't add the kill flag if we're going to postupdate manually.
   Builder.addReg(InPtrReg, getKillRegState(InPtrKill &&
