@@ -86,5 +86,49 @@ LD [XY+-], R
     (3, 5)
 ```
 ---
+Load of i16. Clobbers the pointer.
 
+Perhaps correct this with hld afterward?
 
+```
+ld a, [hli]
+ld h, [hl]
+ld l, a
+
+ld a, [hli]
+ld h, [hl]
+ld l, a
+
+ld a, [hli]
+ld h, [hl]
+ld l, a
+...
+```
+---
+Add of i8 to i16
+
+```
+    ld hl, value
+    add hl, reg16
+    ld HIGH(reg16), h
+    ld LOW(reg16), l
+```
+
+```
+    ld a, value
+    add a, LOW(reg16)
+    ld LOW(reg16), a
+    jr nc, .noCarry
+    inc HIGH(reg16)
+.noCarry
+```
+
+```
+    ld a, value
+    add a, LOW(reg16)
+    ld LOW(reg16), a
+    adc a, HIGH(reg16)
+    sub a, LOW(reg16)
+    ld HIGH(reg16), a
+```
+---
