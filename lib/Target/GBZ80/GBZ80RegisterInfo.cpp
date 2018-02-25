@@ -174,6 +174,15 @@ GBZ80RegisterInfo::getCrossCopyRegClass(const TargetRegisterClass *RC) const {
   return RC;
 }
 
+bool GBZ80RegisterInfo::shouldCoalesce(MachineInstr *MI,
+                                       const TargetRegisterClass *SrcRC,
+                                       unsigned SubReg,
+                                       const TargetRegisterClass *DstRC,
+                                       unsigned DstSubReg,
+                                       const TargetRegisterClass *NewRC) const {
+  return NewRC != &GB::ARegRegClass;
+}
+
 void GBZ80RegisterInfo::splitReg(unsigned Reg,
                                unsigned &LoReg,
                                unsigned &HiReg) const {
