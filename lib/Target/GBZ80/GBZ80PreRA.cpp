@@ -21,12 +21,19 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/RegisterScavenging.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Target/TargetRegisterInfo.h"
 
 using namespace llvm;
 
 #define PASS_NAME "GBZ80 pre RA"
 #define DEBUG_TYPE "gbz80-pre-ra"
+
+static cl::opt<bool> WidenRegClasses(
+  "gb-widen-regclasses",
+  cl::desc("GBZ80: Widen regclasses before RA."),
+  cl::init(true)
+);
 
 namespace {
 
@@ -73,9 +80,9 @@ bool GBZ80PreRA::widenConstrainedRegClasses() {
 
   for (auto &MBB : *MF) {
     for (auto MII = MBB.begin(); MII != MBB.end(); ++MII) {
-      if (!MII->isCopy())
+      if (MII->getNumOperands() < 1)
         continue;
-      if (!TRI->isPhysicalRegister(MII->getOperand(1).getReg()))
+      if (!MII->getOperand(0).isReg() || !MII->getOperand(0).isDef())
         continue;
       unsigned DefReg = MII->getOperand(0).getReg();
       if (!TRI->isVirtualRegister(DefReg))
@@ -85,16 +92,64 @@ bool GBZ80PreRA::widenConstrainedRegClasses() {
       if (NewRC == DefRC)
         continue;
 
+      // Either it must be a regular copy, or the def must not be constrained
+      // to the narrow class.
+      /*if (!MII->isCopy() ||
+          TII->getRegClass(MII->getDesc(), 0, TRI, *MF) == DefRC)
+        continue;*/
+      // Check if it's safe to set the def of the instr to the new def.
+      bool SafeToReassignDef = MII->isCopy() ||
+        TII->getRegClass(MII->getDesc(), 0, TRI, *MF) == NewRC;
+
       // We can widen this regclass. Just replace the reg with a new vreg of
       // a larger regclass and insert a copy to the old reg.
       // XXX: What if the orig is a Pair with subreg? Could it get messy?
       // FIXME: Is there a benefit to skipping the copy if all uses are not
       // also regclass-constrained?
       unsigned NewReg = MRI->createVirtualRegister(NewRC);
-      MII->getOperand(0).setReg(NewReg);
-      auto NextMI = MII->getNextNode();
-      MII = BuildMI(MBB, NextMI, DebugLoc(), TII->get(GB::COPY), DefReg)
-        .addReg(NewReg);
+      DEBUG(
+        dbgs() << "Widening def of:\n";
+        MII->dump();
+        if (SafeToReassignDef)
+          dbgs() << "Old def is updated to %vreg"
+                 << TRI->virtReg2Index(NewReg) << "\n";
+        dbgs() << "Updating uses:\n";);
+      if (SafeToReassignDef)
+        MII->getOperand(0).setReg(NewReg);
+      else {
+        MII = BuildMI(MBB, MII->getNextNode(), DebugLoc(), TII->get(GB::COPY), NewReg)
+          .addReg(DefReg);
+      }
+
+      for (auto &MOU : MRI->use_operands(DefReg)) {
+        MachineInstr *MOI = MOU.getParent();
+        if (MOI == MII)
+          continue;
+        unsigned OIdx = MOI->getOperandNo(&MOU);
+        if (MOI->isCopy() || MOI->isPHI() ||
+            TII->getRegClass(MOI->getDesc(), OIdx, TRI, *MF) == NewRC) {
+          DEBUG(MOI->dump());
+          MOU.setReg(NewReg);
+        }
+      }
+
+      if (SafeToReassignDef) {
+        // If we changed the real def to NewDef and there are still uses of
+        // DefReg, make a copy here.
+        if (!MRI->use_empty(DefReg))
+          MII = BuildMI(MBB, MII->getNextNode(), DebugLoc(),
+                        TII->get(GB::COPY), DefReg)
+            .addReg(NewReg);
+      } else {
+        // If we made a copy to NewDef, but didn't actually use it, remove it.
+        if (MRI->use_empty(NewReg)) {
+          MachineInstr *DeadCopy = &*MII;
+          --MII;
+          DeadCopy->eraseFromParent();
+          continue;
+        }
+      }
+
       Modified = true;
     }
   }
@@ -200,7 +255,8 @@ bool GBZ80PreRA::runOnMachineFunction(MachineFunction &MF) {
   Modified |= combinePostIncMemAccs();
 
   // Widen constrained regclasses.
-  Modified |= widenConstrainedRegClasses();
+  if (WidenRegClasses)
+    Modified |= widenConstrainedRegClasses();
 
   return Modified;
 }
