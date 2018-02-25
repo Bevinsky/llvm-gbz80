@@ -70,15 +70,17 @@ const TargetRegisterClass *
 GBZ80RegisterInfo::getLargestLegalSuperClass(const TargetRegisterClass *RC,
                                            const MachineFunction &MF) const {
   const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
-  if (TRI->isTypeLegalForClass(*RC, MVT::i16)) {
-    return &GB::PairsRegClass;
-  }
-
-  if (TRI->isTypeLegalForClass(*RC, MVT::i8)) {
+  if (RC == &GB::ARegRegClass || RC == &GB::CRegRegClass ||
+      RC == &GB::GPR8RegClass) {
     return &GB::GPR8RegClass;
   }
 
-  llvm_unreachable("Invalid register size");
+  if (RC == &GB::HLPairsRegClass || RC == &GB::BCDEPairsRegClass ||
+      RC == &GB::PairsRegClass) {
+    return &GB::PairsRegClass;
+  }
+
+  return RC;
 }
 
 /// Fold a frame offset shared between two add instructions into a single one.
