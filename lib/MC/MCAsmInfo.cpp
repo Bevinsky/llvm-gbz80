@@ -26,6 +26,7 @@ MCAsmInfo::MCAsmInfo() {
   LabelSuffix = ":";
   PrivateGlobalPrefix = "L";
   PrivateLabelPrefix = PrivateGlobalPrefix;
+  HexadecimalPrefix = "0x";
   LinkerPrivateGlobalPrefix = "";
   InlineAsmStart = "APP";
   InlineAsmEnd = "NO_APP";

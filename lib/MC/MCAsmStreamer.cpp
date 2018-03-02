@@ -775,8 +775,11 @@ void MCAsmStreamer::EmitBytes(StringRef Data) {
   if (MAI->getAscizDirective() && Data.back() == 0) {
     OS << MAI->getAscizDirective();
     Data = Data.substr(0, Data.size()-1);
-  } else {
+  } else if (MAI->getAsciiDirective()) {
     OS << MAI->getAsciiDirective();
+  } else {
+    EmitBinaryData(Data);
+    return;
   }
 
   PrintQuotedString(Data, OS);
@@ -786,13 +789,14 @@ void MCAsmStreamer::EmitBytes(StringRef Data) {
 void MCAsmStreamer::EmitBinaryData(StringRef Data) {
   // This is binary data. Print it in a grid of hex bytes for readability.
   const size_t Cols = 4;
+  const char *HexP = MAI->getHexadecimalPrefix().data();
   for (size_t I = 0, EI = alignTo(Data.size(), Cols); I < EI; I += Cols) {
     size_t J = I, EJ = std::min(I + Cols, Data.size());
     assert(EJ > 0);
     OS << MAI->getData8bitsDirective();
     for (; J < EJ - 1; ++J)
-      OS << format("0x%02x", uint8_t(Data[J])) << ", ";
-    OS << format("0x%02x", uint8_t(Data[J]));
+      OS << format("%s%02x", HexP, uint8_t(Data[J])) << ", ";
+    OS << format("%s%02x", HexP, uint8_t(Data[J]));
     EmitEOL();
   }
 }

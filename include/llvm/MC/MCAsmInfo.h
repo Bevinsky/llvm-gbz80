@@ -128,6 +128,9 @@ protected:
   /// a plain private symbol should be used.  Defaults to "".
   StringRef LinkerPrivateGlobalPrefix;
 
+  /// Hexadecimal prefix. Defaults to "0x".
+  StringRef HexadecimalPrefix;
+
   /// If these are nonempty, they contain a directive to emit before and after
   /// an inline assembly statement.  Defaults to "#APP\n", "#NO_APP\n"
   const char *InlineAsmStart;
@@ -474,6 +477,7 @@ public:
   bool needsLocalForSize() const { return NeedsLocalForSize; }
   StringRef getPrivateGlobalPrefix() const { return PrivateGlobalPrefix; }
   StringRef getPrivateLabelPrefix() const { return PrivateLabelPrefix; }
+  StringRef getHexadecimalPrefix() const { return HexadecimalPrefix; }
 
   bool hasLinkerPrivateGlobalPrefix() const {
     return LinkerPrivateGlobalPrefix[0] != '\0';
