@@ -178,6 +178,16 @@ def iaddr : ComplexPattern<i16, 1, "SelectIAddr", [], []>;
 // Match for HRAM indirect reg. e.g. LD [$FF00+C]
 //def HRAMRegAddr : ComplexPattern<iPTR, 1, "SelectHRAMRegAddr", [add], [SDNPWantRoot]>;
 
+
+// Output pattern fragments.
+def toHi      : OutPatFrag<(ops node:$in),
+  (i8 (EXTRACT_SUBREG (i16 $in), sub_hi))>;
+def toLo      : OutPatFrag<(ops node:$in),
+  (i8 (EXTRACT_SUBREG (i16 $in), sub_lo))>;
+def buildPair : OutPatFrag<(ops node:$hi, node:$lo),
+  (i16 (REG_SEQUENCE Pairs, (i8 $hi), sub_hi, (i8 $lo), sub_lo))>;
+
+
 //===----------------------------------------------------------------------===//
 // GBZ80 predicates for subtarget features
 //===----------------------------------------------------------------------===//
@@ -416,6 +426,7 @@ multiclass ALUOp<string Name, SDNode MatchOp, list<Register> ExtraUses = [],
   }
 
   let Uses = ExtraUses, Defs = [rF, rA], Constraints = "$dst = $src1" in {
+    let isCommutable = IsComm in
     def 16r : Pseudo<(outs Pairs:$dst), (ins Pairs:$src1, Pairs:$src2),
       !strconcat(Name, "16r\t$dst, $src2"),
       [(set Pairs:$dst, (MatchOp Pairs:$src1, Pairs:$src2))]>;
@@ -431,7 +442,7 @@ defm ADC : ALUOp<"ADC", adde, [rF], 1>;
 defm SUB : ALUOp<"SUB", sub>;
 defm SBC : ALUOp<"SBC", sube, [rF]>;
 defm AND : ALUOp<"AND", and,  [],   1>;
-defm OR  : ALUOp<"OR", or,    [],   1>;
+defm OR  : ALUOp<"OR",  or,   [],   1>;
 defm XOR : ALUOp<"XOR", xor,  [],   1>;
 
 // TODO: Make pseudos for cp when the format is decided.
@@ -476,14 +487,6 @@ foreach Name = ["INC", "DEC"] in {
     !strconcat(Name, "\t$src"),
     []>;
 }
-
-def : Pat<(add GPR8:$src, 1),  (INC_r $src)>;
-def : Pat<(add GPR8:$src, -1), (DEC_r $src)>;
-def : Pat<(sub GPR8:$src, 1),  (DEC_r $src)>;
-
-def : Pat<(add Pairs:$src, 1),  (INC_ss $src)>;
-def : Pat<(add Pairs:$src, -1), (DEC_ss $src)>;
-def : Pat<(sub Pairs:$src, 1),  (DEC_ss $src)>;
 
 ///===============================
 /// Other 16-bit arithmetic
@@ -991,23 +994,42 @@ let hasSideEffects = 1 in {
 /// Patterns
 ///===============================
 
+
+// Load of symbol address.
 def : Pat<(i16 (GBZ80Wrapper tglobaladdr:$dst)),
           (LD_dd_nn tglobaladdr:$dst)>;
 
+// Call of global.
 def : Pat<(GBZ80call (i16 tglobaladdr:$dst)),
           (CALL_nn tglobaladdr:$dst)>;
 def : Pat<(GBZ80call (i16 texternalsym:$dst)),
           (CALL_nn texternalsym:$dst)>;
 
+// Store to global.
 def : Pat<(store i8:$src, (GBZ80Wrapper tglobaladdr:$addr)),
           (LD_nn_A $src, $addr)>;
 def : Pat<(store i8:$src, (GBZ80Wrapper texternalsym:$addr)),
           (LD_nn_A $src, $addr)>;
 
+// Load from global.
 def : Pat<(i8 (load (GBZ80Wrapper tglobaladdr:$addr))),
           (LD_A_nn $addr)>;
 def : Pat<(i8 (load (GBZ80Wrapper texternalsym:$addr))),
           (LD_A_nn $addr)>;
+
+// Inc/dec of i8 and i16.
+def : Pat<(add GPR8:$src, 1),  (INC_r $src)>;
+def : Pat<(add GPR8:$src, -1), (DEC_r $src)>;
+def : Pat<(sub GPR8:$src, 1),  (DEC_r $src)>;
+
+def : Pat<(add Pairs:$src, 1),  (INC_ss $src)>;
+def : Pat<(add Pairs:$src, -1), (DEC_ss $src)>;
+def : Pat<(sub Pairs:$src, 1),  (DEC_ss $src)>;
+
+def : Pat<(ineg GPR8:$src),
+  (INC_r (XOR_n $src, 0xFF))>;
+def : Pat<(ineg Pairs:$src),
+  (INC_ss (XOR16i $src, 0xFFFF))>;
 
 /*
 def : Pat<(add i16:$src, (AVRWrapper tglobaladdr:$src2)),
