@@ -152,7 +152,7 @@ bool MachineCSE::PerformTrivialCopyPropagation(MachineInstr *MI,
     if (DefMI->getOperand(1).getSubReg())
       continue;
     const TargetRegisterClass *RC = MRI->getRegClass(Reg);
-    if (!MRI->constrainRegClass(SrcReg, RC))
+    if (!MRI->constrainRegClass(SrcReg, RC, 2))
       continue;
     DEBUG(dbgs() << "Coalescing: " << *DefMI);
     DEBUG(dbgs() << "***     to: " << *MI);
