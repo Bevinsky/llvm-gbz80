@@ -1490,6 +1490,12 @@ GBZ80TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
   MachineBasicBlock *trueMBB = MF->CreateMachineBasicBlock(LLVM_BB);
   MachineBasicBlock *falseMBB = MF->CreateMachineBasicBlock(LLVM_BB);
 
+  if (auto *Fallthrough = MBB->getFallThrough()) {
+    // Fix the fallthrough here or the CFG will get messed up after the
+    // block insertion.
+    BuildMI(MBB, dl, TII.get(GB::JR_e)).addMBB(Fallthrough);
+  }
+
   MachineFunction::iterator I;
   for (I = MF->begin(); I != MF->end() && &(*I) != MBB; ++I);
   if (I != MF->end()) ++I;
@@ -1504,13 +1510,13 @@ GBZ80TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
   trueMBB->transferSuccessorsAndUpdatePHIs(MBB);
 
   GBCC::CondCodes CC = (GBCC::CondCodes)MI.getOperand(3).getImm();
-  BuildMI(MBB, dl, TII.get(GB::JP_cc_nn)).addMBB(trueMBB).addImm(CC);
-  BuildMI(MBB, dl, TII.get(GB::JP_nn)).addMBB(falseMBB);
+  BuildMI(MBB, dl, TII.get(GB::JR_cc_e)).addMBB(trueMBB).addImm(CC);
+  BuildMI(MBB, dl, TII.get(GB::JR_e)).addMBB(falseMBB);
   MBB->addSuccessor(falseMBB);
   MBB->addSuccessor(trueMBB);
 
   // Unconditionally flow back to the true block
-  BuildMI(falseMBB, dl, TII.get(GB::JP_nn)).addMBB(trueMBB);
+  BuildMI(falseMBB, dl, TII.get(GB::JR_e)).addMBB(trueMBB);
   falseMBB->addSuccessor(trueMBB);
 
   // Set up the Phi node to determine where we came from
