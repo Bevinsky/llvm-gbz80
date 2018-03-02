@@ -48,12 +48,179 @@ private:
 
   MachineFunction *MF;
 
+  MachineInstr *expandSimple16(MachineInstr &, unsigned LoOpc, unsigned HiOpc);
+  MachineInstr *expandPseudo(MachineInstr &);
+  bool expandPseudos();
   bool expandBranch16();
   bool optimizeCP();
 
 };
 
 char GBZ80PostISel::ID = 0;
+
+MachineInstr *GBZ80PostISel::expandSimple16(MachineInstr &MI, unsigned LoOpc,
+                                            unsigned HiOpc) {
+  /*
+  Emit from dst = OP src, src2/imm
+    loA = EXTRACT_SUBREG src, sub_lo
+    if src2
+     loB = EXTRACT_SUBREG src2, sub_lo
+     loR = LoOpc loA, loB
+    else
+     loR = LoOpc loA, LO(imm)
+    end
+    hiA = EXTRACT_SUBREG src, sub_hi
+    if src2
+     hiB = EXTRACT_SUBREG src2, sub_hi
+     hiR = HiOpc hiA, hiB
+    else
+     hiR = HiOpc hiA, HI(imm)
+    end
+    idef = IMPLICIT_DEF
+    iA = INSERT_SUBREG idef, loR, sub_lo
+    iR = INSERT_SUBREG iA, hiR, sub_hi
+  */
+
+  DebugLoc dl = MI.getDebugLoc();
+  unsigned PairDst = MI.getOperand(0).getReg();
+  unsigned PairSrc = MI.getOperand(1).getReg();
+  bool RegOp = MI.getOperand(2).isReg();
+  unsigned PairSrc2 = RegOp ? MI.getOperand(2).getReg() : 0;
+  int8_t ImmLo = !RegOp ? (int8_t)MI.getOperand(2).getImm() : 0;
+  int8_t ImmHi = !RegOp ? (int8_t)(MI.getOperand(2).getImm() >> 8) : 0;
+
+  unsigned loAGPR = MRI->createVirtualRegister(&GB::GPR8RegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), loAGPR)
+    .addReg(PairSrc, 0, GB::sub_lo);
+
+  unsigned hiAGPR = MRI->createVirtualRegister(&GB::GPR8RegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), hiAGPR)
+    .addReg(PairSrc, 0, GB::sub_hi);
+
+  unsigned loB;
+  unsigned hiB;
+  if (RegOp) {
+    loB = MRI->createVirtualRegister(&GB::GPR8RegClass);
+    hiB = MRI->createVirtualRegister(&GB::GPR8RegClass);
+    BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), loB)
+      .addReg(PairSrc2, 0, GB::sub_lo);
+    BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), hiB)
+      .addReg(PairSrc2, 0, GB::sub_hi);
+  }
+
+  unsigned loA = MRI->createVirtualRegister(&GB::ARegRegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), loA)
+    .addReg(loAGPR);
+
+  unsigned loR = MRI->createVirtualRegister(&GB::ARegRegClass);
+  if (RegOp) {
+    BuildMI(*MI.getParent(), MI, dl, TII->get(LoOpc), loR)
+      .addReg(loA)
+      .addReg(loB);
+  } else {
+    BuildMI(*MI.getParent(), MI, dl, TII->get(LoOpc), loR)
+      .addReg(loA)
+      .addImm(ImmLo);
+  }
+
+  unsigned loGPR = MRI->createVirtualRegister(&GB::GPR8RegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), loGPR)
+    .addReg(loR);
+
+  unsigned Imp1 = MRI->createVirtualRegister(&GB::PairsRegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::IMPLICIT_DEF), Imp1);
+
+  unsigned Imp2 = MRI->createVirtualRegister(&GB::PairsRegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::INSERT_SUBREG), Imp2)
+    .addReg(Imp1)
+    .addReg(loGPR)
+    .addImm(GB::sub_lo);
+
+  unsigned hiA = MRI->createVirtualRegister(&GB::ARegRegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), hiA)
+    .addReg(hiAGPR);
+
+  unsigned hiR = MRI->createVirtualRegister(&GB::ARegRegClass);
+  if (RegOp) {
+    BuildMI(*MI.getParent(), MI, dl, TII->get(HiOpc), hiR)
+      .addReg(hiA)
+      .addReg(hiB);
+  } else {
+    BuildMI(*MI.getParent(), MI, dl, TII->get(HiOpc), hiR)
+      .addReg(hiA)
+      .addImm(ImmHi);
+  }
+
+  unsigned hiGPR = MRI->createVirtualRegister(&GB::GPR8RegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), hiGPR)
+    .addReg(hiR);
+
+  unsigned Imp3 = MRI->createVirtualRegister(&GB::PairsRegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::INSERT_SUBREG), Imp3)
+    .addReg(Imp2)
+    .addReg(hiGPR)
+    .addImm(GB::sub_hi);
+
+  MachineInstr *I = BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY),
+                            PairDst)
+    .addReg(Imp3);
+
+  return I;
+}
+
+MachineInstr *GBZ80PostISel::expandPseudo(MachineInstr &MI) {
+  switch (MI.getOpcode()) {
+  default: break;
+  case GB::ADD16r:
+    return expandSimple16(MI, GB::ADD_r, GB::ADC_r);
+  case GB::ADD16i:
+    return expandSimple16(MI, GB::ADD_n, GB::ADC_n);
+  case GB::ADC16r:
+    return expandSimple16(MI, GB::ADC_r, GB::ADC_r);
+  case GB::ADC16i:
+    return expandSimple16(MI, GB::ADC_n, GB::ADC_n);
+  case GB::SUB16r:
+    return expandSimple16(MI, GB::SUB_r, GB::SBC_r);
+  case GB::SUB16i:
+    return expandSimple16(MI, GB::SUB_n, GB::SBC_n);
+  case GB::SBC16r:
+    return expandSimple16(MI, GB::SBC_r, GB::SBC_r);
+  case GB::SBC16i:
+    return expandSimple16(MI, GB::SBC_n, GB::SBC_n);
+
+  case GB::AND16r:
+    return expandSimple16(MI, GB::AND_r, GB::AND_r);
+  case GB::AND16i:
+    return expandSimple16(MI, GB::AND_n, GB::AND_n);
+
+  case GB::OR16r:
+    return expandSimple16(MI, GB::OR_r, GB::OR_r);
+  case GB::OR16i:
+    return expandSimple16(MI, GB::OR_n, GB::OR_n);
+
+  case GB::XOR16r:
+    return expandSimple16(MI, GB::XOR_r, GB::XOR_r);
+  case GB::XOR16i:
+    return expandSimple16(MI, GB::XOR_n, GB::XOR_n);
+
+  }
+  return nullptr;
+}
+
+bool GBZ80PostISel::expandPseudos() {
+  bool Modified = false;
+  for (auto &MBB : *MF) {
+    for (auto MII = MBB.begin(); MII != MBB.end(); ) {
+      MachineInstr *New = expandPseudo(*MII);
+      if (New) {
+        MII->eraseFromParent();
+        MII = New->getIterator();
+      }
+      ++MII;
+    }
+  }
+  return Modified;
+}
 
 
 bool GBZ80PostISel::optimizeCP() {
@@ -80,6 +247,8 @@ bool GBZ80PostISel::runOnMachineFunction(MachineFunction &MF) {
   TRI = STI.getRegisterInfo();
   TII = STI.getInstrInfo();
   MRI = &MF.getRegInfo();
+
+  Modified |= expandPseudos();
 
   // Expand branch and select pseudos:
   //  * BR16
