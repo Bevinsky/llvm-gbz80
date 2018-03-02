@@ -139,6 +139,49 @@ def uimm8p2n : PatLeaf<(imm), [{
 }], uimm8p2n_XFORM>, Operand<i8>;
 
 
+
+def uimm16hip2_XFORM : SDNodeXForm<imm,
+[{
+  return CurDAG->getTargetConstant(Log2_32(uint16_t(N->getZExtValue())) - 8,
+                                   SDLoc(N), MVT::i8);
+}]>;
+def uimm16hip2 : PatLeaf<(imm), [{
+  return isPowerOf2_32(uint16_t(N->getZExtValue())) &&
+         Log2_32(uint16_t(N->getZExtValue())) >= 8;
+}], uimm16hip2_XFORM>, Operand<i16>;
+
+def uimm16lop2_XFORM : SDNodeXForm<imm,
+[{
+  return CurDAG->getTargetConstant(Log2_32(uint16_t(N->getZExtValue())),
+                                   SDLoc(N), MVT::i8);
+}]>;
+def uimm16lop2 : PatLeaf<(imm), [{
+  return isPowerOf2_32(uint16_t(N->getZExtValue())) &&
+         Log2_32(uint16_t(N->getZExtValue())) < 8;
+}], uimm16lop2_XFORM>, Operand<i16>;
+def uimm16hip2n_XFORM : SDNodeXForm<imm,
+[{
+  return CurDAG->getTargetConstant(Log2_32(uint16_t(~N->getZExtValue())) - 8,
+                                   SDLoc(N), MVT::i8);
+}]>;
+def uimm16hip2n : PatLeaf<(imm), [{
+  return isPowerOf2_32(uint16_t(~N->getZExtValue())) &&
+         Log2_32(uint16_t(~N->getZExtValue())) >= 8;
+}], uimm16hip2n_XFORM>, Operand<i16>;
+
+def uimm16lop2n_XFORM : SDNodeXForm<imm,
+[{
+  return CurDAG->getTargetConstant(Log2_32(uint16_t(~N->getZExtValue())),
+                                   SDLoc(N), MVT::i8);
+}]>;
+def uimm16lop2n : PatLeaf<(imm), [{
+  return isPowerOf2_32(uint16_t(~N->getZExtValue())) &&
+         Log2_32(uint16_t(N->getZExtValue())) < 8;
+}], uimm16lop2n_XFORM>, Operand<i16>;
+
+
+
+
 // Relative jump target, either a signed immediate or a basic block.
 def relbrtarget8 : Operand<OtherVT> {
   let PrintMethod   = "printPCRelImm";
@@ -780,23 +823,21 @@ def BIT_r : I16<(outs), (ins GPR8:$src, uimm3:$imm),
   []>;
 
 let Constraints = "$dst = $src" in {
-  // Match an OR with a power of 2. XFORM the immediate to a log2.
   def SET_r : I16<(outs GPR8:$dst), (ins GPR8:$src, uimm8p2:$imm),
     "SET\t$imm, $dst",
-    [(set GPR8:$dst, (or GPR8:$src, uimm8p2:$imm))]>;
+    []>;
 
-  // Match an AND with an inverse of a power of two. XFORM the immediate.
-  def RES_r : I16<(outs GPR8:$dst), (ins GPR8:$src, uimm8p2n:$imm),
+  def RES_r : I16<(outs GPR8:$dst), (ins GPR8:$src, uimm8p2:$imm),
     "RES\t$imm, $dst",
-    [(set GPR8:$dst, (and GPR8:$src, uimm8p2n:$imm))]>;
+    []>;
 }
 
 let mayLoad = 1, mayStore = 1 in {
-  def SET_HL : I16<(outs), (ins uimm8p2:$imm, HLPairs:$ptr),
+  def SET_HL : I16<(outs), (ins imm8:$imm, HLPairs:$ptr),
     "SET\t$imm, [HL]",
     []>;
 
-  def RES_HL : I16<(outs), (ins uimm8p2n:$imm, HLPairs:$ptr),
+  def RES_HL : I16<(outs), (ins imm8:$imm, HLPairs:$ptr),
     "RES\t$imm, [HL]",
     []>;
 }
@@ -1026,10 +1067,30 @@ def : Pat<(add Pairs:$src, 1),  (INC_ss $src)>;
 def : Pat<(add Pairs:$src, -1), (DEC_ss $src)>;
 def : Pat<(sub Pairs:$src, 1),  (DEC_ss $src)>;
 
+// Simplification for negation.
 def : Pat<(ineg GPR8:$src),
   (INC_r (XOR_n $src, 0xFF))>;
 def : Pat<(ineg Pairs:$src),
   (INC_ss (XOR16i $src, 0xFFFF))>;
+
+// Patterns for RES and SET on i8.
+let AddedComplexity = 10 in {
+// Match an OR with a power of 2. XFORM the immediate to a log2.
+def : Pat<(or GPR8:$src, uimm8p2:$imm),
+  (SET_r $src, (uimm8p2_XFORM imm:$imm))>;
+// Match an AND with an inverse of a power of two. XFORM the immediate.
+def : Pat<(and GPR8:$src, uimm8p2n:$imm),
+  (RES_r $src, (uimm8p2n_XFORM imm:$imm))>;
+}
+
+let AddedComplexity = 10 in {
+def : Pat<(or Pairs:$src, uimm16hip2:$imm),
+  (buildPair (SET_r (toHi $src), (uimm16hip2_XFORM imm:$imm)),
+             (toLo $src))>;
+def : Pat<(or Pairs:$src, uimm16lop2:$imm),
+  (buildPair (toHi $src),
+             (SET_r (toLo $src), (uimm16lop2_XFORM imm:$imm)))>;
+}
 
 /*
 def : Pat<(add i16:$src, (AVRWrapper tglobaladdr:$src2)),

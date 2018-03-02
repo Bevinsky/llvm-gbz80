@@ -28,6 +28,11 @@ PUSH-POP pairs if this is safe (won't invalidate anything inside the region).
 
 Eliminate unneeded PUSH-POP pairs between stack loads/stores when possible.
 
+---
+
+Expand ANDs with masks that have more than one bit clear, and ORs with sets of
+bits. This should be profitable up to 4 bits for i16 and 2 bits for i8.
+
 ## Patterns and expansions
 
 ```
