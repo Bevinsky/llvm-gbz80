@@ -25,7 +25,10 @@ namespace llvm {
 void GBZ80SectionData::getAsString(SmallVectorImpl<char> &Str) const {
   raw_svector_ostream O(Str);
   // XXX: this will break if sectionname has quotes in it.
-  O << "SECTION \"" << (SectionName.empty() ? "@" : SectionName) << "\",";
+  if (SectionName.empty())
+    O << "SECTION @,";
+  else
+    O << "SECTION \"" << SectionName << "\",";
   switch (Type) {
   case ST_ROM0:  O << "ROM0"; break;
   case ST_ROMX:  O << "ROMX"; break;
@@ -107,7 +110,8 @@ GBZ80TargetObjectFile::SelectSectionForGlobal(const GlobalObject *GO,
     Type = ST_WRAM0;
   }
 
-  return getSection(Kind, StringRef(), Type, 0, ~0U, GO->getAlignment(), GO);
+  return getSection(Kind, (Twine(GO->getParent()->getName()) + "_" + GO->getName()).str(),
+                    Type, 0, ~0U, GO->getAlignment(), GO);
 }
 MCSection* 
 GBZ80TargetObjectFile::getSectionForConstant(const DataLayout &DL,

@@ -30,7 +30,7 @@ enum GBSectionType {
 class GBZ80SectionData {
   // Name of the section. If this is empty, the section is named @.
   // TODO: Or? Should we come up with something else for this?
-  StringRef SectionName;
+  std::string SectionName;
 
   // Section type.
   GBSectionType Type;
