@@ -23,8 +23,9 @@ GBZ80MCAsmInfo::GBZ80MCAsmInfo(const Triple &TT) {
   CommentString = ";";
   PrivateGlobalPrefix = "L";
   PrivateLabelPrefix = ".L";
+  HexadecimalPrefix = "$";
   UseIntegratedAssembler = false;
-  AsciiDirective = "DB ";
+  AsciiDirective = nullptr; // Can't use this because of hardcoded strings.
   AscizDirective = nullptr; // DB does not zero-terminate.
   MaxInstLength = 3;
   ZeroDirective = nullptr;
