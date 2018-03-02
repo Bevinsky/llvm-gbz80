@@ -249,10 +249,16 @@ bool GBZ80InstrInfo::isReallyTriviallyReMaterializable(const MachineInstr &MI,
 }
 
 void GBZ80InstrInfo::reMaterialize(MachineBasicBlock &MBB,
-  MachineBasicBlock::iterator MI, unsigned DestReg,
+  MachineBasicBlock::iterator I, unsigned DestReg,
   unsigned SubIdx, const MachineInstr &Orig,
   const TargetRegisterInfo &TRI) const {
-  assert(false);
+  // TODO: This will likely break if we remat things that set flags.
+
+  MachineInstr *MI = MBB.getParent()->CloneMachineInstr(&Orig);
+  MBB.insert(I, MI);
+
+  MachineInstr &NewMI = *std::prev(I);
+  NewMI.substituteRegister(Orig.getOperand(0).getReg(), DestReg, SubIdx, TRI);
 }
 
 bool GBZ80InstrInfo::analyzeBranch(MachineBasicBlock &MBB,

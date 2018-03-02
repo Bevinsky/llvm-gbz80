@@ -4,10 +4,7 @@ Need to add some hooks/flags containing info about what flags instrs
 produce. e.g., does the instruction produce a valid zero flag at all?
 Also need hooks to detect users of flags as well.
 
-Add commutability to the relevant instructions.
-
-Rematerialization of the simpler instructions (LD n, LD nn). If remat doesn't
-sink those into branch blocks then we need to do that ourselves.
+Remat of more? What can we safely remat?
 
 ## Optimizations
 
