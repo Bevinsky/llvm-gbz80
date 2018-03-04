@@ -860,10 +860,16 @@ def : Pat<(i16 (anyext i8:$src)),
           (INSERT_SUBREG (i16 (IMPLICIT_DEF)), i8:$src, sub_lo)>;
 
 def : Pat<(i8 (trunc i16:$src)),
-          (EXTRACT_SUBREG i16:$src, sub_lo)>;
+          (toLo $src)>;
 
 def : Pat<(sext_inreg i16:$src, i8),
-          (SEXT (i8 (EXTRACT_SUBREG i16:$src, sub_lo)))>;
+          (SEXT (i8 (toLo $src)))>;
+
+def : Pat<(i8 (trunc (GBZ80lsr (GBZ80lsr (GBZ80lsr (GBZ80lsr (GBZ80lsr (GBZ80lsr (GBZ80lsr (GBZ80lsr i16:$src)))))))))),
+  (toHi $src)>;
+
+def : Pat<(i8 (trunc (GBZ80asr (GBZ80asr (GBZ80asr (GBZ80asr (GBZ80asr (GBZ80asr (GBZ80asr (GBZ80asr i16:$src)))))))))),
+  (toHi $src)>;
 
 ///===============================
 /// Jumps
