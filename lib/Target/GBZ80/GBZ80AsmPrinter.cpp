@@ -21,6 +21,7 @@
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
+#include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
@@ -57,6 +58,8 @@ public:
   bool PrintAsmMemoryOperand(const MachineInstr *MI, unsigned OpNum,
                              unsigned AsmVariant, const char *ExtraCode,
                              raw_ostream &O) override;
+
+  void EmitFunctionBodyStart() override;
 
   void EmitInstruction(const MachineInstr *MI) override;
 
@@ -140,6 +143,34 @@ bool GBZ80AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
   }
 #endif
   return false;
+}
+
+void GBZ80AsmPrinter::EmitFunctionBodyStart() {
+  const MachineRegisterInfo &MRI = MF->getRegInfo();
+
+  SmallString<128> C;
+  raw_svector_ostream O(C);
+  O << " ===== Function " << MF->getName() << " =====";
+  OutStreamer->emitRawComment(C, false);
+  C.clear();
+  O << " Arguments: ";
+  if (!MRI.livein_empty()) {
+    for (MachineRegisterInfo::livein_iterator
+      I = MRI.livein_begin(), E = MRI.livein_end(); I != E; ++I) {
+      O << PrintReg(I->first, MRI.getTargetRegisterInfo());
+      if (std::next(I) != E)
+        O << ", ";
+    }
+  }
+  OutStreamer->emitRawComment(C, false);
+  C.clear();
+  O << " Returns:   TODO";
+  OutStreamer->emitRawComment(C, false);
+  C.clear();
+  O << " =====================";
+  for (unsigned i = 0; i < MF->getName().size(); i++)
+    O << "=";
+  OutStreamer->emitRawComment(C, false);
 }
 
 void GBZ80AsmPrinter::EmitInstruction(const MachineInstr *MI) {
