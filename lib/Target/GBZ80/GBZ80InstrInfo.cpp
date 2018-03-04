@@ -503,10 +503,10 @@ unsigned GBZ80InstrInfo::insertBranch(MachineBasicBlock &MBB,
   unsigned Count = 0;
   // The condition list is in reverse (first condition is last), so iterate
   // backwards through the conditions, adding them one after another.
-  // Start at sz-2 and add 1 for the branch type.
-  for (int i = Cond.size() - 2; i >= 0; i -= 2) {
-    GBCC::CondCodes CC = (GBCC::CondCodes)Cond[i].getImm();
-    bool IsTrueBranch = Cond[i + 1].getImm();
+  for (auto I = Cond.rbegin(); I != Cond.rend(); ++I) {
+    bool IsTrueBranch = I->getImm();
+    ++I;
+    GBCC::CondCodes CC = (GBCC::CondCodes)I->getImm();
     MachineBasicBlock *Dest = IsTrueBranch ? TBB : FBB;
     // If Dest is null, this means we must jump to the fallthrough.
     if (!Dest)
