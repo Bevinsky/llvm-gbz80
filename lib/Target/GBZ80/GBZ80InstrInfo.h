@@ -109,6 +109,10 @@ public:
     unsigned SubIdx, const MachineInstr &Orig,
     const TargetRegisterInfo &TRI) const override;
 
+  MachineInstr *commuteInstructionImpl(MachineInstr &MI, bool NewMI,
+    unsigned OpIdx1,
+    unsigned OpIdx2) const override;
+
   // Branch analysis.
   bool analyzeBranch(MachineBasicBlock &MBB, MachineBasicBlock *&TBB,
                      MachineBasicBlock *&FBB,

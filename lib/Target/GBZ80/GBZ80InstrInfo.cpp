@@ -18,6 +18,7 @@
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineMemOperand.h"
+#include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/MC/MCContext.h"
@@ -259,6 +260,63 @@ void GBZ80InstrInfo::reMaterialize(MachineBasicBlock &MBB,
 
   MachineInstr &NewMI = *std::prev(I);
   NewMI.substituteRegister(Orig.getOperand(0).getReg(), DestReg, SubIdx, TRI);
+}
+
+bool safeToCommute(MachineInstr &MI, unsigned OpIdx1, unsigned OpIdx2) {
+  MachineRegisterInfo &MRI = MI.getParent()->getParent()->getRegInfo();
+  const TargetRegisterInfo *TRI = MRI.getTargetRegisterInfo();
+  MachineBasicBlock &MBB = *MI.getParent();
+  MachineInstr *LHSDef = nullptr;
+  MachineInstr *RHSDef = nullptr;
+  unsigned LHSReg = MI.getOperand(OpIdx1).getReg();
+  unsigned RHSReg = MI.getOperand(OpIdx2).getReg();
+  unsigned LHSSub = MI.getOperand(OpIdx1).getSubReg();
+  unsigned RHSSub = MI.getOperand(OpIdx2).getSubReg();
+
+  // Looking for defines of LHSReg and RHSReg. Search upwards.
+  MachineBasicBlock::reverse_iterator Begin = MI, End = MBB.rend();
+  ++Begin;
+  while (Begin != End) {
+    if (!LHSDef && Begin->definesRegister(LHSReg, TRI))
+      LHSDef = &*Begin;
+    if (!RHSDef && Begin->definesRegister(RHSReg, TRI))
+      RHSDef = &*Begin;
+    if (LHSDef && RHSDef)
+      break;
+    Begin++;
+  }
+
+  if (!LHSDef || !RHSDef)
+    return false;
+
+  if (LHSDef->getOpcode() != GB::COPY || RHSDef->getOpcode() != GB::COPY)
+    return false;
+
+  bool LHSIsSafe = !TRI->isPhysicalRegister(LHSDef->getOperand(1).getReg()) &&
+    (MRI.getRegClass(LHSDef->getOperand(1).getReg()) == &GB::GPR8RegClass ||
+     MRI.getRegClass(LHSDef->getOperand(1).getReg())->hasSuperClassEq(&GB::PairsRegClass));
+
+  bool RHSIsSafe =
+    (TRI->isPhysicalRegister(RHSDef->getOperand(1).getReg()) &&
+     RHSDef->getOperand(1).getReg() == GB::rA) ||
+    (!TRI->isPhysicalRegister(RHSDef->getOperand(1).getReg()) &&
+     MRI.getRegClass(RHSDef->getOperand(1).getReg()) == &GB::ARegRegClass);
+
+  return LHSIsSafe && RHSIsSafe;
+}
+
+MachineInstr *
+GBZ80InstrInfo::commuteInstructionImpl(MachineInstr &MI, bool NewMI,
+                                       unsigned OpIdx1, unsigned OpIdx2) const{
+  MachineRegisterInfo &MRI = MI.getParent()->getParent()->getRegInfo();
+
+  // Commuting an arithmetic instruction where the LHS is a copy from GPR
+  // and the RHS is a copy from A is beneficial.
+  if (MRI.getRegClass(MI.getOperand(OpIdx2).getReg()) == &GB::GPR8RegClass) {
+    if (!safeToCommute(MI, OpIdx1, OpIdx2))
+      return nullptr;
+  }
+  return TargetInstrInfo::commuteInstructionImpl(MI, NewMI, OpIdx1, OpIdx2);
 }
 
 bool GBZ80InstrInfo::analyzeBranch(MachineBasicBlock &MBB,
