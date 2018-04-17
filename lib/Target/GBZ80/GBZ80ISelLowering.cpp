@@ -254,6 +254,8 @@ const char *GBZ80TargetLowering::getTargetNodeName(unsigned Opcode) const {
     NODE(CMPC);
     NODE(TST);
     NODE(SELECT_CC);
+    NODE(SELECT_BR);
+    NODE(BR16);
 #undef NODE
   }
 }
@@ -552,10 +554,8 @@ SDValue GBZ80TargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const
     return DAG.getNode(GBISD::SELECT_CC, dl, MVT::i8, TrueV, FalseV, TargetCC, Cmp);
   }
   assert(LHS.getValueType() == MVT::i16 && "not i6 select_CC?");
-
   //SDVTList VTs = DAG.getVTList(Op.getValueType(), MVT::Glue);
   SDValue Ops[] = { TrueV, FalseV, TargetCC, LHS, RHS };
-
   return DAG.getNode(GBISD::SELECT_BR, dl, Op.getValueType(), Ops);
 }
 
@@ -565,7 +565,7 @@ SDValue GBZ80TargetLowering::LowerSETCC(SDValue Op, SelectionDAG &DAG) const {
   ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(2))->get();
   SDLoc dl(Op);
 
-  SDValue TargetCC = DAG.getConstant(CC, dl, MVT::i8, true);
+  SDValue TargetCC = DAG.getTargetConstant(CC, dl, MVT::i8);
   SDValue TrueV = DAG.getConstant(1, dl, Op.getValueType());
   SDValue FalseV = DAG.getConstant(0, dl, Op.getValueType());
 
@@ -1380,7 +1380,7 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
   // cpi N, 0
   // breq RemBB
   BuildMI(BB, dl, TII.get(GB::CP_n)).addReg(ShiftAmtSrcReg).addImm(0);
-  BuildMI(BB, dl, TII.get(GB::JP_cc_nn)).addMBB(RemBB).addImm(GBCC::COND_Z);
+  BuildMI(BB, dl, TII.get(GB::JR_cc_e)).addMBB(RemBB).addImm(GBCC::COND_Z);
 
   // LoopBB:
   // ShiftReg = phi [%SrcReg, BB], [%ShiftReg2, LoopBB]
@@ -1400,7 +1400,7 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
   BuildMI(LoopBB, dl, TII.get(Opc), ShiftReg2).addReg(ShiftReg);
   BuildMI(LoopBB, dl, TII.get(GB::DEC_r), ShiftAmtReg2)
       .addReg(ShiftAmtReg);
-  BuildMI(LoopBB, dl, TII.get(GB::JP_cc_nn)).addMBB(LoopBB).addImm(GBCC::COND_NZ);
+  BuildMI(LoopBB, dl, TII.get(GB::JR_cc_e)).addMBB(LoopBB).addImm(GBCC::COND_NZ);
 
   // RemBB:
   // DestReg = phi [%SrcReg, BB], [%ShiftReg, LoopBB]
@@ -1470,7 +1470,8 @@ GBZ80TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     return insertMul(MI, MBB);*/
   }
 
-  assert((Opc == GB::Select8_8 || Opc == GB::Select16_8) &&
+  assert((Opc == GB::Select8_8 || Opc == GB::Select16_8 ||
+          Opc == GB::Select8_16 || Opc == GB::Select16_16) &&
          "Unexpected instr type to insert");
 
   const GBZ80InstrInfo &TII = (const GBZ80InstrInfo &)*MI.getParent()
@@ -1493,7 +1494,7 @@ GBZ80TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
   if (auto *Fallthrough = MBB->getFallThrough()) {
     // Fix the fallthrough here or the CFG will get messed up after the
     // block insertion.
-    BuildMI(MBB, dl, TII.get(GB::JR_e)).addMBB(Fallthrough);
+    BuildMI(MBB, dl, TII.get(GB::JP_nn)).addMBB(Fallthrough);
   }
 
   MachineFunction::iterator I;
@@ -1509,14 +1510,26 @@ GBZ80TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
                   std::next(MachineBasicBlock::iterator(MI)), MBB->end());
   trueMBB->transferSuccessorsAndUpdatePHIs(MBB);
 
-  GBCC::CondCodes CC = (GBCC::CondCodes)MI.getOperand(3).getImm();
-  BuildMI(MBB, dl, TII.get(GB::JR_cc_e)).addMBB(trueMBB).addImm(CC);
-  BuildMI(MBB, dl, TII.get(GB::JR_e)).addMBB(falseMBB);
+  if (Opc == GB::Select8_8 || Opc == GB::Select16_8) {
+    // Grab a real GBZ80 CC and make a jump instr.
+    GBCC::CondCodes CC = (GBCC::CondCodes)MI.getOperand(3).getImm();
+    BuildMI(MBB, dl, TII.get(GB::JP_cc_nn)).addMBB(trueMBB).addImm(CC);
+  } else {
+    // Take the ISD CC and build a BR16.
+    ISD::CondCode CC = (ISD::CondCode)MI.getOperand(3).getImm();
+    unsigned LReg = MI.getOperand(4).getReg();
+    unsigned LSub = MI.getOperand(4).getSubReg();
+    unsigned RReg = MI.getOperand(5).getReg();
+    unsigned RSub = MI.getOperand(5).getSubReg();
+    BuildMI(MBB, dl, TII.get(GB::BR16))
+      .addMBB(trueMBB).addImm(CC).addReg(LReg, 0, LSub).addReg(RReg, 0, RSub);
+  }
+  BuildMI(MBB, dl, TII.get(GB::JP_nn)).addMBB(falseMBB);
   MBB->addSuccessor(falseMBB);
   MBB->addSuccessor(trueMBB);
 
   // Unconditionally flow back to the true block
-  BuildMI(falseMBB, dl, TII.get(GB::JR_e)).addMBB(trueMBB);
+  BuildMI(falseMBB, dl, TII.get(GB::JP_nn)).addMBB(trueMBB);
   falseMBB->addSuccessor(trueMBB);
 
   // Set up the Phi node to determine where we came from

@@ -906,7 +906,7 @@ let isBranch = 1, isTerminator = 1 in {
 
   // Pseudo compare+jump for i16. Expand after isel.
   def BR16 : Pseudo<(outs), (ins brtarget16:$targ, condcode:$cc, Pairs:$lhs, Pairs:$rhs),
-    "BR16\t$targ",
+    "BR16\t$targ, $lhs, $rhs",
     [(GBZ80br16 bb:$targ, condcode:$cc, Pairs:$lhs, Pairs:$rhs)]>;
 }
 
@@ -929,22 +929,23 @@ def Select16_8 : SelectPseudo<
   [(set i16:$dst, (GBZ80selectcc i16:$src, i16:$src2, imm:$cc))]
 >;
 
-/// These two cannot be expanded easily. Do it after ISEL instead.
 
 // Select an i16 from an i16 comparison.
-def Select16_16 : Pseudo<
-  (outs Pairs:$dst),
-  (ins Pairs:$src, Pairs:$src2, i8imm:$cc, Pairs:$lhs, Pairs:$rhs),
-  "# Select16_16 PSEUDO",
-  [(set i16:$dst, (GBZ80selectbr i16:$src, i16:$src2, imm:$cc, i16:$lhs, i16:$rhs))]
->;
-// Select an i8 from an i16 comparison.
-def Select8_16 : Pseudo<
-  (outs GPR8:$dst),
-  (ins GPR8:$src, GPR8:$src2, i8imm:$cc, Pairs:$lhs, Pairs:$rhs),
-  "# Select8_16 PSEUDO",
-  [(set i8:$dst, (GBZ80selectbr i8:$src, i8:$src2, imm:$cc, i16:$lhs, i16:$rhs))]
->;
+let usesCustomInserter = 1 in {
+  def Select16_16 : Pseudo<
+    (outs Pairs:$dst),
+    (ins Pairs:$src, Pairs:$src2, i8imm:$cc, Pairs:$lhs, Pairs:$rhs),
+    "# Select16_16 PSEUDO",
+    [(set i16:$dst, (GBZ80selectbr i16:$src, i16:$src2, timm:$cc, i16:$lhs, i16:$rhs))]
+  >;
+  // Select an i8 from an i16 comparison.
+  def Select8_16 : Pseudo<
+    (outs GPR8:$dst),
+    (ins GPR8:$src, GPR8:$src2, i8imm:$cc, Pairs:$lhs, Pairs:$rhs),
+    "# Select8_16 PSEUDO",
+    [(set i8:$dst, (GBZ80selectbr i8:$src, i8:$src2, timm:$cc, i16:$lhs, i16:$rhs))]
+  >;
+}
 
 
 ///===============================
