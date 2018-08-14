@@ -30,21 +30,11 @@ namespace GBCC {
 /// These correspond to `GBZ80_*_COND` in `GBZ80InstrInfo.td`.
 /// They must be kept in synch.
   enum CondCodes {
+  COND_INVALID = 0,
   COND_NZ, // i8 _NE
   COND_Z,  // i8 _EQ
   COND_NC, // i8 _UGE
   COND_C,  // i8 _ULT
-  /*
-  COND_EQ, //!< Equal
-  COND_NE, //!< Not equal
-  COND_GE, //!< Greater than or equal
-  COND_LT, //!< Less than
-  COND_SH, //!< Unsigned same or higher
-  COND_LO, //!< Unsigned lower
-  COND_MI, //!< Minus
-  COND_PL, //!< Plus
-  */
-  COND_INVALID
 };
 
 } // end of namespace GBCC
@@ -67,14 +57,18 @@ enum TOF {
 
 } // end of namespace GBII
 
+typedef std::tuple<GBCC::CondCodes, bool, GBCC::CondCodes, bool> CCPair;
+
 /// Utilities related to the GBZ80 instruction set.
 class GBZ80InstrInfo : public GBZ80GenInstrInfo {
 public:
+  
+  static std::map<CCPair, unsigned> CCPair2CPClass;
+  static std::map<unsigned, std::vector<CCPair>> CPClass2CCPairs;
+
   explicit GBZ80InstrInfo();
 
   const GBZ80RegisterInfo &getRegisterInfo() const { return RI; }
-  const MCInstrDesc &getBrCond(GBCC::CondCodes CC) const;
-  GBCC::CondCodes getCondFromBranchOpc(unsigned Opc) const;
   GBCC::CondCodes getOppositeCondition(GBCC::CondCodes CC) const;
 
   bool isConditionalBranch(const MachineInstr &) const;
@@ -82,6 +76,12 @@ public:
   // Invert the condition code given by Cond. Returns true if it was
   // possible.
   bool invertCondition(SmallVectorImpl<MachineOperand> &Cond) const;
+  // Alter the condition to prepare for swapping the operands to a CP.
+  bool swapCondition(SmallVectorImpl<MachineOperand> &Cond) const;
+  // Swap the less-than and greater-than parts of the CP equivalence class.
+  unsigned swapCPClass(unsigned Class) const {
+    return ((Class & 0x1) << 2) | ((Class & 0x4) >> 2) | (Class & 0x2);
+  }
 
   unsigned getInstSizeInBytes(const MachineInstr &MI) const override;
 

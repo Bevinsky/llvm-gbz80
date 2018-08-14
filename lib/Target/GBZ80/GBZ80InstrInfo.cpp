@@ -221,12 +221,45 @@ bool GBZ80InstrInfo::invertCondition(SmallVectorImpl<MachineOperand> &Cond) cons
     //    ->
     //   JR  C1, F
     //   JR !C2, T
-    bool FirstBlockIsT = Cond[1].getImm();
-    Cond[1].setImm(!FirstBlockIsT);
-    GBCC::CondCodes CC = (GBCC::CondCodes)Cond[2].getImm();
-    Cond[2].setImm((int)getOppositeCondition(CC));
+    bool FirstBlockIsT = Cond[3].getImm();
+    Cond[3].setImm(!FirstBlockIsT);
+    GBCC::CondCodes CC = (GBCC::CondCodes)Cond[0].getImm();
+    Cond[0].setImm((int)getOppositeCondition(CC));
     break;
   }
+  return true;
+}
+
+bool GBZ80InstrInfo::swapCondition(SmallVectorImpl<MachineOperand> &Cond) const {
+  if (Cond.size() > 4)
+    return false;
+  SmallVector<MachineOperand, 4> Copy(Cond.begin(), Cond.end());
+  Cond.clear();
+  CCPair CondTuple;
+  if (Cond.size() == 2)
+    CondTuple = std::make_tuple(
+      (GBCC::CondCodes)Copy[0].getImm(),
+      (bool)Copy[1].getImm(),
+      GBCC::COND_INVALID,
+      false);
+  else if (Cond.size() == 4)
+    CondTuple = std::make_tuple(
+      (GBCC::CondCodes)Copy[2].getImm(),
+      (bool)Copy[3].getImm(),
+      (GBCC::CondCodes)Copy[0].getImm(),
+      (bool)Copy[1].getImm());
+  unsigned CPClass = CCPair2CPClass.at(CondTuple);
+  unsigned SwappedClass = swapCPClass(CPClass);
+  // We could just skip the swap if the classes are the same, but we want to
+  // get the most optimal class here.
+  CondTuple = CPClass2CCPairs.at(SwappedClass).at(0);
+
+  if (std::get<2>(CondTuple) != GBCC::COND_INVALID) {
+    Cond.push_back(MachineOperand::CreateImm(std::get<2>(CondTuple)));
+    Cond.push_back(MachineOperand::CreateImm(std::get<3>(CondTuple)));
+  }
+  Cond.push_back(MachineOperand::CreateImm(std::get<0>(CondTuple)));
+  Cond.push_back(MachineOperand::CreateImm(std::get<1>(CondTuple)));
   return true;
 }
 
@@ -563,7 +596,7 @@ bool GBZ80InstrInfo::reverseBranchCondition(
     SmallVectorImpl<MachineOperand> &Cond) const {
   assert((Cond.size() % 2 == 0) && "Invalid GBZ80 branch condition!");
 
-  return invertCondition(Cond);
+  return !invertCondition(Cond);
 }
 
 bool GBZ80InstrInfo::analyzeBranchPredicate(MachineBasicBlock &MBB,
@@ -665,6 +698,132 @@ unsigned GBZ80InstrInfo::insertIndirectBranch(MachineBasicBlock &MBB,
 
   return getInstSizeInBytes(MI);
 }
+
+std::map<CCPair, unsigned> GBZ80InstrInfo::CCPair2CPClass = {
+  {{GBCC::COND_Z, true, GBCC::COND_INVALID, false}, 0b010},
+  {{GBCC::COND_C, false, GBCC::COND_Z, true}, 0b010},
+  {{GBCC::COND_NZ, false, GBCC::COND_Z, true}, 0b010},
+  {{GBCC::COND_NZ, false, GBCC::COND_NC, true}, 0b010},
+  {{GBCC::COND_Z, true, GBCC::COND_Z, false}, 0b010},
+  {{GBCC::COND_Z, true, GBCC::COND_C, false}, 0b010},
+  {{GBCC::COND_Z, true, GBCC::COND_NZ, false}, 0b010},
+  {{GBCC::COND_Z, true, GBCC::COND_NC, false}, 0b010},
+  {{GBCC::COND_Z, true, GBCC::COND_Z, true}, 0b010},
+  {{GBCC::COND_NC, true, GBCC::COND_INVALID, false}, 0b011},
+  {{GBCC::COND_C, false, GBCC::COND_NC, true}, 0b011},
+  {{GBCC::COND_NC, true, GBCC::COND_Z, false}, 0b011},
+  {{GBCC::COND_NC, true, GBCC::COND_C, false}, 0b011},
+  {{GBCC::COND_NC, true, GBCC::COND_NZ, false}, 0b011},
+  {{GBCC::COND_NC, true, GBCC::COND_NC, false}, 0b011},
+  {{GBCC::COND_Z, true, GBCC::COND_NC, true}, 0b011},
+  {{GBCC::COND_NC, true, GBCC::COND_Z, true}, 0b011},
+  {{GBCC::COND_NC, true, GBCC::COND_NC, true}, 0b011},
+  {{GBCC::COND_C, true, GBCC::COND_INVALID, false}, 0b100},
+  {{GBCC::COND_Z, false, GBCC::COND_C, true}, 0b100},
+  {{GBCC::COND_NC, false, GBCC::COND_C, true}, 0b100},
+  {{GBCC::COND_NC, false, GBCC::COND_NZ, true}, 0b100},
+  {{GBCC::COND_C, true, GBCC::COND_Z, false}, 0b100},
+  {{GBCC::COND_C, true, GBCC::COND_C, false}, 0b100},
+  {{GBCC::COND_C, true, GBCC::COND_NZ, false}, 0b100},
+  {{GBCC::COND_C, true, GBCC::COND_NC, false}, 0b100},
+  {{GBCC::COND_C, true, GBCC::COND_C, true}, 0b100},
+  {{GBCC::COND_Z, true, GBCC::COND_C, true}, 0b110},
+  {{GBCC::COND_C, true, GBCC::COND_Z, true}, 0b110},
+  {{GBCC::COND_Z, false, GBCC::COND_Z, true}, 0b000},
+  {{GBCC::COND_C, false, GBCC::COND_C, true}, 0b000},
+  {{GBCC::COND_NZ, false, GBCC::COND_C, true}, 0b000},
+  {{GBCC::COND_NZ, false, GBCC::COND_NZ, true}, 0b000},
+  {{GBCC::COND_NC, false, GBCC::COND_Z, true}, 0b000},
+  {{GBCC::COND_NC, false, GBCC::COND_NC, true}, 0b000},
+  {{GBCC::COND_Z, true, GBCC::COND_NZ, true}, 0b111},
+  {{GBCC::COND_C, true, GBCC::COND_NC, true}, 0b111},
+  {{GBCC::COND_NZ, true, GBCC::COND_Z, true}, 0b111},
+  {{GBCC::COND_NZ, true, GBCC::COND_NC, true}, 0b111},
+  {{GBCC::COND_NC, true, GBCC::COND_C, true}, 0b111},
+  {{GBCC::COND_NC, true, GBCC::COND_NZ, true}, 0b111},
+  {{GBCC::COND_NZ, true, GBCC::COND_INVALID, false}, 0b101},
+  {{GBCC::COND_Z, false, GBCC::COND_NZ, true}, 0b101},
+  {{GBCC::COND_NZ, true, GBCC::COND_Z, false}, 0b101},
+  {{GBCC::COND_NZ, true, GBCC::COND_C, false}, 0b101},
+  {{GBCC::COND_NZ, true, GBCC::COND_NZ, false}, 0b101},
+  {{GBCC::COND_NZ, true, GBCC::COND_NC, false}, 0b101},
+  {{GBCC::COND_C, true, GBCC::COND_NZ, true}, 0b101},
+  {{GBCC::COND_NZ, true, GBCC::COND_C, true}, 0b101},
+  {{GBCC::COND_NZ, true, GBCC::COND_NZ, true}, 0b101},
+  {{GBCC::COND_Z, false, GBCC::COND_NC, true}, 0b001},
+  {{GBCC::COND_C, false, GBCC::COND_NZ, true}, 0b001},
+};
+
+std::map<unsigned, std::vector<CCPair>> GBZ80InstrInfo::CPClass2CCPairs = {
+{0b010,{
+  {GBCC::COND_Z, true, GBCC::COND_INVALID, false},
+  {GBCC::COND_C, false, GBCC::COND_Z, true},
+  {GBCC::COND_NZ, false, GBCC::COND_Z, true},
+  {GBCC::COND_NZ, false, GBCC::COND_NC, true},
+  {GBCC::COND_Z, true, GBCC::COND_Z, false},
+  {GBCC::COND_Z, true, GBCC::COND_C, false},
+  {GBCC::COND_Z, true, GBCC::COND_NZ, false},
+  {GBCC::COND_Z, true, GBCC::COND_NC, false},
+  {GBCC::COND_Z, true, GBCC::COND_Z, true},
+}},
+{0b011,{
+  {GBCC::COND_NC, true, GBCC::COND_INVALID, false},
+  {GBCC::COND_C, false, GBCC::COND_NC, true},
+  {GBCC::COND_NC, true, GBCC::COND_Z, false},
+  {GBCC::COND_NC, true, GBCC::COND_C, false},
+  {GBCC::COND_NC, true, GBCC::COND_NZ, false},
+  {GBCC::COND_NC, true, GBCC::COND_NC, false},
+  {GBCC::COND_Z, true, GBCC::COND_NC, true},
+  {GBCC::COND_NC, true, GBCC::COND_Z, true},
+  {GBCC::COND_NC, true, GBCC::COND_NC, true},
+}},
+{0b100,{
+  {GBCC::COND_C, true, GBCC::COND_INVALID, false},
+  {GBCC::COND_Z, false, GBCC::COND_C, true},
+  {GBCC::COND_NC, false, GBCC::COND_C, true},
+  {GBCC::COND_NC, false, GBCC::COND_NZ, true},
+  {GBCC::COND_C, true, GBCC::COND_Z, false},
+  {GBCC::COND_C, true, GBCC::COND_C, false},
+  {GBCC::COND_C, true, GBCC::COND_NZ, false},
+  {GBCC::COND_C, true, GBCC::COND_NC, false},
+  {GBCC::COND_C, true, GBCC::COND_C, true},
+}},
+{0b110,{
+  {GBCC::COND_Z, true, GBCC::COND_C, true},
+  {GBCC::COND_C, true, GBCC::COND_Z, true},
+}},
+{0b000,{
+  {GBCC::COND_Z, false, GBCC::COND_Z, true},
+  {GBCC::COND_C, false, GBCC::COND_C, true},
+  {GBCC::COND_NZ, false, GBCC::COND_C, true},
+  {GBCC::COND_NZ, false, GBCC::COND_NZ, true},
+  {GBCC::COND_NC, false, GBCC::COND_Z, true},
+  {GBCC::COND_NC, false, GBCC::COND_NC, true},
+}},
+{0b111,{
+  {GBCC::COND_Z, true, GBCC::COND_NZ, true},
+  {GBCC::COND_C, true, GBCC::COND_NC, true},
+  {GBCC::COND_NZ, true, GBCC::COND_Z, true},
+  {GBCC::COND_NZ, true, GBCC::COND_NC, true},
+  {GBCC::COND_NC, true, GBCC::COND_C, true},
+  {GBCC::COND_NC, true, GBCC::COND_NZ, true},
+}},
+{0b101,{
+  {GBCC::COND_NZ, true, GBCC::COND_INVALID, false},
+  {GBCC::COND_Z, false, GBCC::COND_NZ, true},
+  {GBCC::COND_NZ, true, GBCC::COND_Z, false},
+  {GBCC::COND_NZ, true, GBCC::COND_C, false},
+  {GBCC::COND_NZ, true, GBCC::COND_NZ, false},
+  {GBCC::COND_NZ, true, GBCC::COND_NC, false},
+  {GBCC::COND_C, true, GBCC::COND_NZ, true},
+  {GBCC::COND_NZ, true, GBCC::COND_C, true},
+  {GBCC::COND_NZ, true, GBCC::COND_NZ, true},
+}},
+{0b001,{
+  {GBCC::COND_Z, false, GBCC::COND_NC, true},
+  {GBCC::COND_C, false, GBCC::COND_NZ, true},
+}}
+};
 
 } // end of namespace llvm
 
