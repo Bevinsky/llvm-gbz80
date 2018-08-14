@@ -304,11 +304,224 @@ bool GBZ80PostISel::optimizeCP() {
   return Modified;
 }
 
+struct Branch16Info {
+  MachineInstr *Instr;
+
+  unsigned LHSReg;
+  int16_t LHSImm;
+  unsigned RHSReg;
+  int16_t RHSImm;
+
+  ISD::CondCode CC;
+
+  MachineBasicBlock *True;
+  MachineBasicBlock *False;
+
+
+
+  Branch16Info(MachineInstr *I, unsigned LHS, unsigned RHS,
+               ISD::CondCode CC, MachineBasicBlock *T, MachineBasicBlock *F) {
+    this->Instr = I;
+    this->CC = CC;
+    this->True = T;
+    this->False = F;
+    initialize(LHS, RHS);
+  }
+
+  void initialize(unsigned LHS, unsigned RHS) {
+    MachineRegisterInfo &MRI = True->getParent()->getRegInfo();
+
+    LHSReg = LHS;
+    RHSReg = RHS;
+
+    // XXX: This can probably be made smarter somehow.
+    
+    if (!TargetRegisterInfo::isPhysicalRegister(LHS)) {
+      MachineInstr *DefI = MRI.getVRegDef(LHS);
+      if (DefI->getOpcode() == GB::LD_dd_nn) {
+        LHSReg = 0;
+        LHSImm = DefI->getOperand(1).getImm();
+      }
+    }
+    if (!TargetRegisterInfo::isPhysicalRegister(RHSReg)) {
+      MachineInstr *DefI = MRI.getVRegDef(RHSReg);
+      if (DefI->getOpcode() == GB::LD_dd_nn) {
+        RHSReg = 0;
+        RHSImm = DefI->getOperand(1).getImm();
+      }
+    }
+
+    canonicalize();
+  }
+
+  bool isLHSReg() const { return LHSReg != 0; }
+  bool isRHSReg() const { return RHSReg != 0; }
+
+  void canonicalize() {
+    // Bring immediates to the right hand side.
+    if (!isLHSReg() && isRHSReg()) {
+      std::swap(LHSReg, RHSReg);
+      std::swap(LHSImm, RHSImm);
+      CC = ISD::getSetCCSwappedOperands(CC);
+    }
+
+    // TODO: more simplifications? can't really do form optimizations here.
+  }
+};
+
+
+
 bool GBZ80PostISel::expandBranch16() {
   bool Modified = false;
 
-  // Expand BR16
+  SmallVector<Branch16Info, 8> Work;
+  
+  for (auto &MBB : *MF) {
+    for (auto MII = MBB.begin(); MII != MBB.end(); ++MII) {
+      if (MII->getOpcode() != GB::BR16)
+        continue;
 
+      MachineBasicBlock *T = MII->getOperand(0).getMBB();
+      MachineInstr *Next = MII->getNextNode();
+      MachineBasicBlock *F;
+      if (Next == MBB.end())
+        F = MBB.getFallThrough();
+      else {
+        F = Next->getOperand(0).getMBB();
+        Next->eraseFromParent();
+      }
+      assert(F && "No false block?");
+
+      ISD::CondCode CC = (ISD::CondCode)MII->getOperand(1).getImm();
+      unsigned LHS = MII->getOperand(2).getReg();
+      unsigned RHS = MII->getOperand(3).getReg();
+
+      Work.emplace_back(&*MII, LHS, RHS, CC, T, F);
+    }
+  }
+
+  /*
+    ld a, h
+    cp d
+    jr nz, .SECOND
+    jr .TESTLO
+  .TESTLO
+    ld a, l
+    cp e
+  .SECOND
+    jr CC, .TRUE
+  .FALSE
+  */
+
+  for (auto &BI : Work) {
+    MachineInstr *MI = BI.Instr;
+    DebugLoc dl = MI->getDebugLoc();
+
+    switch (BI.CC) {
+    case ISD::SETEQ:
+    case ISD::SETNE: {
+      /*
+        special case for 0, TODO
+        cmp BC, 00
+
+      LD A, B
+      OR C
+      JR Z/NZ, .T
+      JR .F
+
+        cmp BC, DE
+
+      loA = COPY LHS:lo
+        loR = EXTRACT_SUBREG RHS, lo
+      CP loA, loR/loImm
+      JR_cc Z/NZ, .F
+      LD A, C
+      hiA = COPY LHS:hi
+        hiR = EXTRACT_SUBREG RHS, lo
+      CP hiA, hiR/hiImm
+      JR_cc Z/NZ, .F
+      JR .T
+      */
+
+      unsigned loA = MRI->createVirtualRegister(&GB::ARegRegClass);
+      BuildMI(*MI->getParent(), MI, dl, TII->get(GB::COPY), loA)
+        .addReg(BI.LHSReg, 0, GB::sub_lo);
+
+      if (BI.isRHSReg()) {
+        unsigned loR = MRI->createVirtualRegister(&GB::GPR8RegClass);
+        BuildMI(*MI->getParent(), MI, dl, TII->get(GB::COPY), loR)
+          .addReg(BI.RHSReg, 0, GB::sub_lo);
+        BuildMI(*MI->getParent(), MI, dl, TII->get(GB::CP_r))
+          .addReg(loA)
+          .addReg(loR);
+      } else {
+        BuildMI(*MI->getParent(), MI, dl, TII->get(GB::CP_n))
+          .addReg(loA)
+          .addImm((uint8_t)BI.RHSImm);
+      }
+      BuildMI(*MI->getParent(), MI, dl, TII->get(GB::JR_cc_e))
+        .addMBB(BI.CC == ISD::SETEQ ? BI.False : BI.True)
+        .addImm(GBCC::COND_NZ);
+      
+      MachineBasicBlock *TopBB = MI->getParent();
+      MachineBasicBlock *MidBB = MF->CreateMachineBasicBlock();
+      MF->insert(std::next(MI->getParent()->getIterator()), MidBB);
+
+      BuildMI(TopBB, dl, TII->get(GB::JR_e))
+        .addMBB(MidBB);
+
+      MidBB->transferSuccessorsAndUpdatePHIs(TopBB);
+
+      TopBB->addSuccessor(MidBB);
+      TopBB->addSuccessor(BI.CC == ISD::SETEQ ? BI.False : BI.True);
+
+      for (MachineBasicBlock *Succ : TopBB->successors()) {
+        for (MachineInstr &Phi : *Succ) {
+          if (!Phi.isPHI())
+            break;
+          for (unsigned i = 2; i < Phi.getNumOperands(); i += 2) {
+            if (Phi.getOperand(i).getMBB() == MidBB) {
+              MachineOperand O = Phi.getOperand(i - 1);
+              Phi.addOperand(O);
+              Phi.addOperand(MachineOperand::CreateMBB(TopBB));
+              break;
+            }
+          }
+        }
+      }
+
+      unsigned hiA = MRI->createVirtualRegister(&GB::ARegRegClass);
+      BuildMI(MidBB, dl, TII->get(GB::COPY), hiA)
+        .addReg(BI.LHSReg, 0, GB::sub_hi);
+
+      if (BI.isRHSReg()) {
+        unsigned hiR = MRI->createVirtualRegister(&GB::GPR8RegClass);
+        BuildMI(MidBB, dl, TII->get(GB::COPY), hiR)
+          .addReg(BI.RHSReg, 0, GB::sub_hi);
+        BuildMI(MidBB, dl, TII->get(GB::CP_r))
+          .addReg(hiA)
+          .addReg(hiR);
+      } else {
+        BuildMI(MidBB, dl, TII->get(GB::CP_n))
+          .addReg(hiA)
+          .addImm((uint8_t)(BI.RHSImm >> 8));
+      }
+      BuildMI(MidBB, dl, TII->get(GB::JR_cc_e))
+        .addMBB(BI.CC == ISD::SETEQ ? BI.False : BI.True)
+        .addImm(GBCC::COND_NZ);
+
+      BuildMI(MidBB, dl, TII->get(GB::JR_e))
+        .addMBB(BI.CC == ISD::SETEQ ? BI.True : BI.False);
+
+
+      //MidBB->addSuccessor(BI.False);
+      //MidBB->addSuccessor(BI.True);
+      break;
+    }
+    }
+
+    MI->eraseFromParent();
+  }
 
   return Modified;
 }
@@ -324,10 +537,7 @@ bool GBZ80PostISel::runOnMachineFunction(MachineFunction &MF) {
 
   Modified |= expandPseudos();
 
-  // Expand branch and select pseudos:
-  //  * BR16
-  //  * Select16_8
-  //  * Select16_16
+  // Expand branch16 pseudos.
   Modified |= expandBranch16();
 
   // Optimize compares by swapping operands.
