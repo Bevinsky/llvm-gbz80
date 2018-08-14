@@ -134,3 +134,17 @@ Add of i8 to i16
     ld HIGH(reg16), a
 ```
 ---
+signed hl <= de
+
+```
+    ld a, d
+    xor h
+    and $80
+    jr nz, .differentSigns
+    ; Unsigned comparison with `jr .no` 
+.differentSigns
+    ; a = $80
+    and d ; Filter D's sign bit
+    jr z, .yes
+.no
+```
