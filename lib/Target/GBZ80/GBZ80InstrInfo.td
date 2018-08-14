@@ -914,24 +914,25 @@ let isBranch = 1, isTerminator = 1 in {
 /// Select pseudos
 ///===============================
 
-// Select an i8 from an i8 comparison.
-def Select8_8 : SelectPseudo<
-  (outs GPR8:$dst),
-  (ins GPR8:$src, GPR8:$src2, i8imm:$cc),
-  "# Select8_8 PSEUDO",
-  [(set i8:$dst, (GBZ80selectcc i8:$src, i8:$src2, imm:$cc))]
->;
-// Select an i16 from an i8 comparison.
-def Select16_8 : SelectPseudo<
-  (outs Pairs:$dst),
-  (ins Pairs:$src, Pairs:$src2, i8imm:$cc),
-  "# Select16_8 PSEUDO",
-  [(set i16:$dst, (GBZ80selectcc i16:$src, i16:$src2, imm:$cc))]
->;
+let Defs = [rF] in {
+  // Select an i8 from an i8 comparison.
+  def Select8_8 : Pseudo<
+    (outs GPR8:$dst),
+    (ins GPR8:$src, GPR8:$src2, i8imm:$cc),
+    "# Select8_8 PSEUDO",
+    [(set i8:$dst, (GBZ80selectcc i8:$src, i8:$src2, imm:$cc))]
+  >;
+  // Select an i16 from an i8 comparison.
+  def Select16_8 : Pseudo<
+    (outs Pairs:$dst),
+    (ins Pairs:$src, Pairs:$src2, i8imm:$cc),
+    "# Select16_8 PSEUDO",
+    [(set i16:$dst, (GBZ80selectcc i16:$src, i16:$src2, imm:$cc))]
+  >;
+}
 
-
-// Select an i16 from an i16 comparison.
-let usesCustomInserter = 1 in {
+let Defs = [rF, rA] in {
+  // Select an i16 from an i16 comparison.
   def Select16_16 : Pseudo<
     (outs Pairs:$dst),
     (ins Pairs:$src, Pairs:$src2, i8imm:$cc, Pairs:$lhs, Pairs:$rhs),
@@ -946,7 +947,6 @@ let usesCustomInserter = 1 in {
     [(set i8:$dst, (GBZ80selectbr i8:$src, i8:$src2, timm:$cc, i16:$lhs, i16:$rhs))]
   >;
 }
-
 
 ///===============================
 /// Calls

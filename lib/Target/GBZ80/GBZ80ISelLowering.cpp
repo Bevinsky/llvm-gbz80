@@ -1469,78 +1469,8 @@ GBZ80TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
   case GB::MULSRdRr:
     return insertMul(MI, MBB);*/
   }
-
-  assert((Opc == GB::Select8_8 || Opc == GB::Select16_8 ||
-          Opc == GB::Select8_16 || Opc == GB::Select16_16) &&
-         "Unexpected instr type to insert");
-
-  const GBZ80InstrInfo &TII = (const GBZ80InstrInfo &)*MI.getParent()
-                                ->getParent()
-                                ->getSubtarget()
-                                .getInstrInfo();
-  DebugLoc dl = MI.getDebugLoc();
-
-  // To "insert" a SELECT instruction, we insert the diamond
-  // control-flow pattern. The incoming instruction knows the
-  // destination vreg to set, the condition code register to branch
-  // on, the true/false values to select between, and a branch opcode
-  // to use.
-
-  MachineFunction *MF = MBB->getParent();
-  const BasicBlock *LLVM_BB = MBB->getBasicBlock();
-  MachineBasicBlock *trueMBB = MF->CreateMachineBasicBlock(LLVM_BB);
-  MachineBasicBlock *falseMBB = MF->CreateMachineBasicBlock(LLVM_BB);
-
-  if (auto *Fallthrough = MBB->getFallThrough()) {
-    // Fix the fallthrough here or the CFG will get messed up after the
-    // block insertion.
-    BuildMI(MBB, dl, TII.get(GB::JP_nn)).addMBB(Fallthrough);
-  }
-
-  MachineFunction::iterator I;
-  for (I = MF->begin(); I != MF->end() && &(*I) != MBB; ++I);
-  if (I != MF->end()) ++I;
-  MF->insert(I, trueMBB);
-  MF->insert(I, falseMBB);
-
-  // Transfer remaining instructions and all successors of the current
-  // block to the block which will contain the Phi node for the
-  // select.
-  trueMBB->splice(trueMBB->begin(), MBB,
-                  std::next(MachineBasicBlock::iterator(MI)), MBB->end());
-  trueMBB->transferSuccessorsAndUpdatePHIs(MBB);
-
-  if (Opc == GB::Select8_8 || Opc == GB::Select16_8) {
-    // Grab a real GBZ80 CC and make a jump instr.
-    GBCC::CondCodes CC = (GBCC::CondCodes)MI.getOperand(3).getImm();
-    BuildMI(MBB, dl, TII.get(GB::JP_cc_nn)).addMBB(trueMBB).addImm(CC);
-  } else {
-    // Take the ISD CC and build a BR16.
-    ISD::CondCode CC = (ISD::CondCode)MI.getOperand(3).getImm();
-    unsigned LReg = MI.getOperand(4).getReg();
-    unsigned LSub = MI.getOperand(4).getSubReg();
-    unsigned RReg = MI.getOperand(5).getReg();
-    unsigned RSub = MI.getOperand(5).getSubReg();
-    BuildMI(MBB, dl, TII.get(GB::BR16))
-      .addMBB(trueMBB).addImm(CC).addReg(LReg, 0, LSub).addReg(RReg, 0, RSub);
-  }
-  BuildMI(MBB, dl, TII.get(GB::JP_nn)).addMBB(falseMBB);
-  MBB->addSuccessor(falseMBB);
-  MBB->addSuccessor(trueMBB);
-
-  // Unconditionally flow back to the true block
-  BuildMI(falseMBB, dl, TII.get(GB::JP_nn)).addMBB(trueMBB);
-  falseMBB->addSuccessor(trueMBB);
-
-  // Set up the Phi node to determine where we came from
-  BuildMI(*trueMBB, trueMBB->begin(), dl, TII.get(GB::PHI), MI.getOperand(0).getReg())
-    .addReg(MI.getOperand(1).getReg())
-    .addMBB(MBB)
-    .addReg(MI.getOperand(2).getReg())
-    .addMBB(falseMBB);
-
-  MI.eraseFromParent(); // The pseudo instruction is gone now.
-  return trueMBB;
+  llvm_unreachable("Invalid opcode!");
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
