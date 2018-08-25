@@ -13,10 +13,10 @@
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/Passes.h"
-#include "llvm/Target/TargetInstrInfo.h"
+#include "llvm/CodeGen/TargetInstrInfo.h"
+#include "llvm/CodeGen/TargetRegisterInfo.h"
+#include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetRegisterInfo.h"
-#include "llvm/Target/TargetSubtargetInfo.h"
 #include <utility>
 using namespace llvm;
 
@@ -105,6 +105,16 @@ bool FinalizeMachineBundles::runOnMachineFunction(MachineFunction &MF) {
   return llvm::finalizeBundles(MF);
 }
 
+/// Return the first found DebugLoc that has a DILocation, given a range of
+/// instructions. The search range is from FirstMI to LastMI (exclusive). If no
+/// DILocation is found, then an empty location is returned.
+static DebugLoc getDebugLoc(MachineBasicBlock::instr_iterator FirstMI,
+                            MachineBasicBlock::instr_iterator LastMI) {
+  for (auto MII = FirstMI; MII != LastMI; ++MII)
+    if (MII->getDebugLoc().get())
+      return MII->getDebugLoc();
+  return DebugLoc();
+}
 
 /// finalizeBundle - Finalize a machine instruction bundle which includes
 /// a sequence of instructions starting from FirstMI to LastMI (exclusive).
@@ -123,7 +133,7 @@ void llvm::finalizeBundle(MachineBasicBlock &MBB,
   const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
 
   MachineInstrBuilder MIB =
-      BuildMI(MF, FirstMI->getDebugLoc(), TII->get(TargetOpcode::BUNDLE));
+      BuildMI(MF, getDebugLoc(FirstMI, LastMI), TII->get(TargetOpcode::BUNDLE));
   Bundle.prepend(MIB);
 
   SmallVector<unsigned, 32> LocalDefs;

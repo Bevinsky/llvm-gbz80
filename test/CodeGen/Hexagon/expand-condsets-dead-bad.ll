@@ -1,4 +1,4 @@
-; RUN: llc -march=hexagon -verify-machineinstrs < %s | FileCheck %s
+; RUN: llc -march=hexagon -verify-machineinstrs -hexagon-initial-cfg-cleanup=0 < %s | FileCheck %s
 ; REQUIRES: asserts
 
 ; Check for some output other than crashing.
@@ -51,4 +51,4 @@ b23:                                              ; preds = %b0
   ret void
 }
 
-attributes #0 = { nounwind "target-cpu"="hexagonv5" "target-features"="-hvx,-hvx-double,-long-calls" }
+attributes #0 = { nounwind "target-cpu"="hexagonv5" "target-features"="-hvx,-long-calls" }

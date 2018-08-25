@@ -1,4 +1,4 @@
-; RUN: llc < %s -march=x86-64 -mtriple=x86_64-unknown-linux-gnu -asm-verbose=false -post-RA-scheduler=true | FileCheck %s
+; RUN: llc < %s -mtriple=x86_64-unknown-linux-gnu -asm-verbose=false -post-RA-scheduler=true | FileCheck %s
 
 declare void @bar(i32)
 declare void @car(i32)
@@ -377,7 +377,7 @@ return:
 ; CHECK-LABEL: two_minsize:
 ; CHECK-NOT: XYZ
 ; CHECK: ret
-; CHECK: andl $0, XYZ(%rip)
+; CHECK: movl $0, XYZ(%rip)
 ; CHECK: movl $1, XYZ(%rip)
 ; CHECK-NOT: XYZ
 

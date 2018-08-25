@@ -23,6 +23,7 @@ Basic Commands
    llvm-ar
    llvm-lib
    llvm-nm
+   llvm-objdump
    llvm-config
    llvm-diff
    llvm-cov
@@ -30,6 +31,8 @@ Basic Commands
    llvm-stress
    llvm-symbolizer
    llvm-dwarfdump
+   dsymutil
+   llvm-mca
 
 Debugging Tools
 ~~~~~~~~~~~~~~~
@@ -51,4 +54,6 @@ Developer Tools
    tblgen
    lit
    llvm-build
+   llvm-exegesis
+   llvm-pdbutil
    llvm-readobj
