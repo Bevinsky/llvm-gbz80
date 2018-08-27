@@ -33,7 +33,7 @@ public:
 };
 
 GBZ80ELFObjectWriter::GBZ80ELFObjectWriter(uint8_t OSABI)
-    : MCELFObjectTargetWriter(false, OSABI, ELF::EM_NONE, true, false) {}
+    : MCELFObjectTargetWriter(false, OSABI, ELF::EM_NONE, true/*, false*/) {}
 
 unsigned GBZ80ELFObjectWriter::getRelocType(MCContext &Ctx,
                                           const MCValue &Target,
@@ -43,9 +43,8 @@ unsigned GBZ80ELFObjectWriter::getRelocType(MCContext &Ctx,
   llvm_unreachable("invalid fixup kind!");
 }
 
-MCObjectWriter *createGBZ80ELFObjectWriter(raw_pwrite_stream &OS, uint8_t OSABI) {
-  MCELFObjectTargetWriter *MOTW = new GBZ80ELFObjectWriter(OSABI);
-  return createELFObjectWriter(MOTW, OS, true);
+std::unique_ptr<MCObjectWriter> createGBZ80ELFObjectWriter(raw_pwrite_stream &OS, uint8_t OSABI) {
+  return createELFObjectWriter(llvm::make_unique<GBZ80ELFObjectWriter>(OSABI), OS, true);
 }
 
 } // end of namespace llvm

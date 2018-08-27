@@ -14,7 +14,7 @@
 #ifndef LLVM_GBZ80_INSTR_INFO_H
 #define LLVM_GBZ80_INSTR_INFO_H
 
-#include "llvm/Target/TargetInstrInfo.h"
+#include "llvm/CodeGen/TargetInstrInfo.h"
 
 #include "GBZ80RegisterInfo.h"
 

@@ -16,7 +16,7 @@
 
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetSubtargetInfo.h"
+#include "llvm/CodeGen/TargetSubtargetInfo.h"
 
 #include "GBZ80FrameLowering.h"
 #include "GBZ80ISelLowering.h"

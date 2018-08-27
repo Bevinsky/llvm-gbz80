@@ -15,6 +15,7 @@
 #define LLVM_GBZ80_MCTARGET_DESC_H
 
 #include "llvm/Support/DataTypes.h"
+#include <memory>
 
 namespace llvm {
 
@@ -43,7 +44,7 @@ MCAsmBackend *createGBZ80AsmBackend(const Target &T, const MCRegisterInfo &MRI,
                                   const llvm::MCTargetOptions &TO);
 
 /// Creates an ELF object writer for GBZ80.
-MCObjectWriter *createGBZ80ELFObjectWriter(raw_pwrite_stream &OS, uint8_t OSABI);
+std::unique_ptr<MCObjectWriter> createGBZ80ELFObjectWriter(raw_pwrite_stream &OS, uint8_t OSABI);
 
 } // end namespace llvm
 

@@ -569,9 +569,6 @@ public:
     return nullptr;
   }
 
-  /// Return the number of memory operands.
-  unsigned getNumMemOperands() const { return NumMemRefs; }
-
   /// API for querying MachineInstr properties. They are the same as MCInstrDesc
   /// queries but they are bundle aware.
 
