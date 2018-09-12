@@ -1,5 +1,5 @@
 add_llvm_library(LLVMGBZ80Desc
-  GBZ80AsmBackend.cpp
+#  GBZ80AsmBackend.cpp
   GBZ80ELFObjectWriter.cpp
   GBZ80ELFStreamer.cpp
   GBZ80MCAsmInfo.cpp
