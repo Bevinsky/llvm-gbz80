@@ -1,0 +1,18 @@
+language: cpp
+compiler: gcc
+script: ./travis.sh
+sudo: required
+dist: trusty
+matrix:
+  include:
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-6
+      env:
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
+before_install:
+    - eval "${MATRIX_EVAL}"
