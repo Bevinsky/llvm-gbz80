@@ -22,7 +22,7 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/RegisterScavenging.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Target/TargetRegisterInfo.h"
+#include "llvm/CodeGen/TargetRegisterInfo.h"
 
 using namespace llvm;
 
@@ -107,7 +107,7 @@ bool GBZ80PreRA::widenConstrainedRegClasses() {
       // FIXME: Is there a benefit to skipping the copy if all uses are not
       // also regclass-constrained?
       unsigned NewReg = MRI->createVirtualRegister(NewRC);
-      DEBUG(
+      LLVM_DEBUG(
         dbgs() << "Widening def of:\n";
         MII->dump();
         if (SafeToReassignDef)
@@ -128,7 +128,7 @@ bool GBZ80PreRA::widenConstrainedRegClasses() {
         unsigned OIdx = MOI->getOperandNo(&MOU);
         if (MOI->isCopy() || MOI->isPHI() ||
             TII->getRegClass(MOI->getDesc(), OIdx, TRI, *MF) == NewRC) {
-          DEBUG(MOI->dump());
+          LLVM_DEBUG(MOI->dump());
           MOU.setReg(NewReg);
         }
       }

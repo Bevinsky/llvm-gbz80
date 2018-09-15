@@ -91,6 +91,18 @@ std::error_code errorToErrorCode(Error Err) {
   return EC;
 }
 
+#if LLVM_ENABLE_ABI_BREAKING_CHECKS
+void Error::fatalUncheckedError() const {
+  dbgs() << "Program aborted due to an unhandled Error:\n";
+  if (getPtr())
+    getPtr()->log(dbgs());
+  else
+    dbgs() << "Error value was Success. (Note: Success values must still be "
+              "checked prior to being destroyed).\n";
+  abort();
+}
+#endif
+
 StringError::StringError(const Twine &S, std::error_code EC)
     : Msg(S.str()), EC(EC) {}
 
@@ -98,6 +110,10 @@ void StringError::log(raw_ostream &OS) const { OS << Msg; }
 
 std::error_code StringError::convertToErrorCode() const {
   return EC;
+}
+
+Error createStringError(std::error_code EC, char const *Msg) {
+  return make_error<StringError>(Msg, EC);
 }
 
 void report_fatal_error(Error Err, bool GenCrashDiag) {
@@ -110,6 +126,26 @@ void report_fatal_error(Error Err, bool GenCrashDiag) {
   report_fatal_error(ErrMsg);
 }
 
+} // end namespace llvm
+
+LLVMErrorTypeId LLVMGetErrorTypeId(LLVMErrorRef Err) {
+  return reinterpret_cast<ErrorInfoBase *>(Err)->dynamicClassID();
+}
+
+void LLVMConsumeError(LLVMErrorRef Err) { consumeError(unwrap(Err)); }
+
+char *LLVMGetErrorMessage(LLVMErrorRef Err) {
+  std::string Tmp = toString(unwrap(Err));
+  char *ErrMsg = new char[Tmp.size() + 1];
+  memcpy(ErrMsg, Tmp.data(), Tmp.size());
+  ErrMsg[Tmp.size()] = '\0';
+  return ErrMsg;
+}
+
+void LLVMDisposeErrorMessage(char *ErrMsg) { delete[] ErrMsg; }
+
+LLVMErrorTypeId LLVMGetStringErrorTypeId() {
+  return reinterpret_cast<void *>(&StringError::ID);
 }
 
 #ifndef _MSC_VER

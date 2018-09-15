@@ -30,7 +30,7 @@ class GBZ80TargetMachine : public LLVMTargetMachine {
 public:
   GBZ80TargetMachine(const Target &T, const Triple &TT, StringRef CPU,
                    StringRef FS, const TargetOptions &Options, Optional<Reloc::Model> RM,
-                   CodeModel::Model CM, CodeGenOpt::Level OL);
+                   Optional<CodeModel::Model> CM, CodeGenOpt::Level OL, bool JIT);
 
   const GBZ80Subtarget *getSubtargetImpl() const;
   const GBZ80Subtarget *getSubtargetImpl(const Function &) const override;

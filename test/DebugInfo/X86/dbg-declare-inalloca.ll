@@ -67,7 +67,7 @@
 ; OBJ:   VarName: a
 ; OBJ: }
 ; OBJ: DefRangeRegisterRelSym {
-; OBJ:   BaseRegister: 21
+; OBJ:   BaseRegister: ESP (0x15)
 ; OBJ:   BasePointerOffset: 12
 ; OBJ: }
 ; OBJ: LocalSym {
@@ -78,7 +78,7 @@
 ; OBJ:   VarName: b
 ; OBJ: }
 ; OBJ: DefRangeRegisterRelSym {
-; OBJ:   BaseRegister: 21
+; OBJ:   BaseRegister: ESP (0x15)
 ; OBJ:   BasePointerOffset: 16
 ; OBJ: }
 ; FIXME: Retain unused.
@@ -90,7 +90,7 @@
 ; OBJ:   VarName: c
 ; OBJ: }
 ; OBJ: DefRangeRegisterRelSym {
-; OBJ:   BaseRegister: 21
+; OBJ:   BaseRegister: ESP (0x15)
 ; OBJ:   BasePointerOffset: 24
 ; OBJ: }
 ; OBJ-LABEL: ProcEnd {
@@ -109,15 +109,15 @@ define void @f(<{ %struct.NonTrivial, i32, i32, i32 }>* inalloca) local_unnamed_
 entry:
   %a = getelementptr inbounds <{ %struct.NonTrivial, i32, i32, i32 }>, <{ %struct.NonTrivial, i32, i32, i32 }>* %0, i32 0, i32 0
   %b = getelementptr inbounds <{ %struct.NonTrivial, i32, i32, i32 }>, <{ %struct.NonTrivial, i32, i32, i32 }>* %0, i32 0, i32 1
-  tail call void @llvm.dbg.declare(metadata i32* %c, metadata !20, metadata !24), !dbg !25
-  tail call void @llvm.dbg.declare(metadata i32* %b, metadata !22, metadata !24), !dbg !26
-  tail call void @llvm.dbg.declare(metadata %struct.NonTrivial* %a, metadata !23, metadata !24), !dbg !27
+  call void @llvm.dbg.declare(metadata i32* %b, metadata !22, metadata !24), !dbg !26
+  call void @llvm.dbg.declare(metadata %struct.NonTrivial* %a, metadata !23, metadata !24), !dbg !27
   %1 = load i32, i32* %b, align 4, !dbg !28, !tbaa !30
   %tobool = icmp eq i32 %1, 0, !dbg !28
   br i1 %tobool, label %if.else, label %if.then, !dbg !34
 
 if.then:                                          ; preds = %entry
   %c = getelementptr inbounds <{ %struct.NonTrivial, i32, i32, i32 }>, <{ %struct.NonTrivial, i32, i32, i32 }>* %0, i32 0, i32 3
+  call void @llvm.dbg.declare(metadata i32* %c, metadata !20, metadata !24), !dbg !25
   %2 = load i32, i32* %c, align 4, !dbg !35, !tbaa !30
   tail call void @g(i32 %2) #4, !dbg !37
   br label %if.end, !dbg !38
@@ -159,7 +159,7 @@ attributes #4 = { nounwind }
 !4 = !{i32 2, !"CodeView", i32 1}
 !5 = !{i32 2, !"Debug Info Version", i32 3}
 !6 = !{!"clang version 5.0.0 "}
-!7 = distinct !DISubprogram(name: "f", scope: !1, file: !1, line: 8, type: !8, isLocal: false, isDefinition: true, scopeLine: 8, flags: DIFlagPrototyped, isOptimized: true, unit: !0, variables: !19)
+!7 = distinct !DISubprogram(name: "f", scope: !1, file: !1, line: 8, type: !8, isLocal: false, isDefinition: true, scopeLine: 8, flags: DIFlagPrototyped, isOptimized: true, unit: !0, retainedNodes: !19)
 !8 = !DISubroutineType(types: !9)
 !9 = !{null, !10, !13, !13, !13}
 !10 = distinct !DICompositeType(tag: DW_TAG_structure_type, name: "NonTrivial", file: !1, line: 1, size: 32, elements: !11, identifier: ".?AUNonTrivial@@")

@@ -1,14 +1,14 @@
-; RUN: llc -march=mips -relocation-model=static < %s | FileCheck --check-prefixes=ALL,SYM32,O32,O32BE %s
-; RUN: llc -march=mipsel -relocation-model=static < %s | FileCheck --check-prefixes=ALL,SYM32,O32,O32LE %s
+; RUN: llc -march=mips -relocation-model=static < %s | FileCheck -allow-deprecated-dag-overlap --check-prefixes=ALL,SYM32,O32,O32BE %s
+; RUN: llc -march=mipsel -relocation-model=static < %s | FileCheck -allow-deprecated-dag-overlap --check-prefixes=ALL,SYM32,O32,O32LE %s
 
 ; RUN-TODO: llc -march=mips64 -relocation-model=static -target-abi o32 < %s | FileCheck --check-prefixes=ALL,SYM32,O32 %s
 ; RUN-TODO: llc -march=mips64el -relocation-model=static -target-abi o32 < %s | FileCheck --check-prefixes=ALL,SYM32,O32 %s
 
-; RUN: llc -march=mips64 -relocation-model=static -target-abi n32 < %s | FileCheck --check-prefixes=ALL,SYM32,N32,NEW,NEWBE %s
-; RUN: llc -march=mips64el -relocation-model=static -target-abi n32 < %s | FileCheck --check-prefixes=ALL,SYM32,N32,NEW,NEWLE %s
+; RUN: llc -march=mips64 -relocation-model=static -target-abi n32 < %s | FileCheck -allow-deprecated-dag-overlap --check-prefixes=ALL,SYM32,N32,NEW,NEWBE %s
+; RUN: llc -march=mips64el -relocation-model=static -target-abi n32 < %s | FileCheck -allow-deprecated-dag-overlap --check-prefixes=ALL,SYM32,N32,NEW,NEWLE %s
 
-; RUN: llc -march=mips64 -relocation-model=static -target-abi n64 < %s | FileCheck --check-prefixes=ALL,SYM64,N64,NEW,NEWBE %s
-; RUN: llc -march=mips64el -relocation-model=static -target-abi n64 < %s | FileCheck --check-prefixes=ALL,SYM64,N64,NEW,NEWLE %s
+; RUN: llc -march=mips64 -relocation-model=static -target-abi n64 < %s | FileCheck -allow-deprecated-dag-overlap --check-prefixes=ALL,SYM64,N64,NEW,NEWBE %s
+; RUN: llc -march=mips64el -relocation-model=static -target-abi n64 < %s | FileCheck -allow-deprecated-dag-overlap --check-prefixes=ALL,SYM64,N64,NEW,NEWLE %s
 
 ; Test the effect of varargs on floating point types in the non-variable part
 ; of the argument list as specified by section 2 of the MIPSpro N32 Handbook.
@@ -111,7 +111,8 @@ entry:
 
 ; The first four arguments are the same in O32/N32/N64.
 ; The non-variable portion should be unaffected.
-; O32-DAG:           sw $4, 4([[R2]])
+; O32-DAG:           mtc1 $4, $f0
+; O32-DAG:           swc1 $f0, 4([[R2]])
 ; NEW-DAG:           swc1 $f12, 4([[R2]])
 
 ; The varargs portion is dumped to stack

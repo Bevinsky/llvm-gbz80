@@ -31,9 +31,9 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Target/TargetRegisterInfo.h"
+#include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
-#include "llvm/Target/TargetSubtargetInfo.h"
+#include "llvm/CodeGen/TargetSubtargetInfo.h"
 
 #define DEBUG_TYPE "GBZ80-asm-printer"
 
@@ -157,7 +157,7 @@ void GBZ80AsmPrinter::EmitFunctionBodyStart() {
   if (!MRI.livein_empty()) {
     for (MachineRegisterInfo::livein_iterator
       I = MRI.livein_begin(), E = MRI.livein_end(); I != E; ++I) {
-      O << PrintReg(I->first, MRI.getTargetRegisterInfo());
+      O << printReg(I->first, MRI.getTargetRegisterInfo());
       if (std::next(I) != E)
         O << ", ";
     }
@@ -206,7 +206,7 @@ void GBZ80AsmPrinter::EmitLinkage(const GlobalValue *GV,
 }
 
 void GBZ80AsmPrinter::EmitFunctionHeader() {
-  const Function *F = MF->getFunction();
+  const Function *F = &MF->getFunction();
 
   if (isVerbose())
     OutStreamer->GetCommentOS()

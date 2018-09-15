@@ -60,6 +60,8 @@ getVariant(uint64_t LLVMDisassembler_VariantKind) {
 bool AArch64ExternalSymbolizer::tryAddingSymbolicOperand(
     MCInst &MI, raw_ostream &CommentStream, int64_t Value, uint64_t Address,
     bool IsBranch, uint64_t Offset, uint64_t InstSize) {
+  if (!SymbolLookUp)
+    return false;
   // FIXME: This method shares a lot of code with
   //        MCExternalSymbolizer::tryAddingSymbolicOperand. It may be possible
   //        refactor the MCExternalSymbolizer interface to allow more of this
@@ -99,8 +101,8 @@ bool AArch64ExternalSymbolizer::tryAddingSymbolicOperand(
         EncodedInst |= MCRI.getEncodingValue(MI.getOperand(0).getReg()); // reg
         SymbolLookUp(DisInfo, EncodedInst, &ReferenceType, Address,
                      &ReferenceName);
-        CommentStream << format("0x%llx",
-                                0xfffffffffffff000LL & (Address + Value));
+        CommentStream << format("0x%llx", (0xfffffffffffff000LL & Address) +
+                                              Value * 0x1000);
     } else if (MI.getOpcode() == AArch64::ADDXri ||
                MI.getOpcode() == AArch64::LDRXui ||
                MI.getOpcode() == AArch64::LDRXl ||

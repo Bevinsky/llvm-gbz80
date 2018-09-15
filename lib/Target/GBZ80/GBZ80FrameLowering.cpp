@@ -53,7 +53,7 @@ bool GBZ80FrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
 void GBZ80FrameLowering::emitPrologue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
   MachineBasicBlock::iterator MBBI = MBB.begin();
-  CallingConv::ID CallConv = MF.getFunction()->getCallingConv();
+  CallingConv::ID CallConv = MF.getFunction().getCallingConv();
   DebugLoc DL = (MBBI != MBB.end()) ? MBBI->getDebugLoc() : DebugLoc();
   const GBZ80Subtarget &STI = MF.getSubtarget<GBZ80Subtarget>();
   const GBZ80InstrInfo &TII = *STI.getInstrInfo();
@@ -88,7 +88,7 @@ void GBZ80FrameLowering::emitPrologue(MachineFunction &MF,
 
 void GBZ80FrameLowering::emitEpilogue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
-  CallingConv::ID CallConv = MF.getFunction()->getCallingConv();
+  CallingConv::ID CallConv = MF.getFunction().getCallingConv();
  
   MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
   assert(MBBI->getDesc().isReturn() &&
@@ -175,7 +175,7 @@ bool GBZ80FrameLowering::spillCalleeSavedRegisters(
 
 bool GBZ80FrameLowering::restoreCalleeSavedRegisters(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
-    const std::vector<CalleeSavedInfo> &CSI,
+    std::vector<CalleeSavedInfo> &CSI,
     const TargetRegisterInfo *TRI) const {
   if (CSI.empty()) {
     return false;

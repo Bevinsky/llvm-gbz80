@@ -14,7 +14,7 @@
 #ifndef LLVM_GBZ80_REGISTER_INFO_H
 #define LLVM_GBZ80_REGISTER_INFO_H
 
-#include "llvm/Target/TargetRegisterInfo.h"
+#include "llvm/CodeGen/TargetRegisterInfo.h"
 
 #define GET_REGINFO_HEADER
 #include "GBZ80GenRegisterInfo.inc"
@@ -55,7 +55,8 @@ public:
     unsigned SubReg,
     const TargetRegisterClass *DstRC,
     unsigned DstSubReg,
-    const TargetRegisterClass *NewRC) const override;
+    const TargetRegisterClass *NewRC,
+    LiveIntervals &LIS) const override;
   /// Splits a 16-bit `DREGS` register into the lo/hi register pair.
   /// \param Reg A 16-bit register to split.
   void splitReg(unsigned Reg, unsigned &LoReg, unsigned &HiReg) const;

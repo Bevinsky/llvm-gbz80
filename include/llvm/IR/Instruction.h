@@ -34,6 +34,7 @@ namespace llvm {
 class BasicBlock;
 class FastMathFlags;
 class MDNode;
+class Module;
 struct AAMDNodes;
 
 template <> struct ilist_alloc_traits<Instruction> {
@@ -113,6 +114,10 @@ public:
   /// \pre I is a valid iterator into BB.
   void moveBefore(BasicBlock &BB, SymbolTableList<Instruction>::iterator I);
 
+  /// Unlink this instruction from its current basic block and insert it into
+  /// the basic block that MovePos lives in, right after MovePos.
+  void moveAfter(Instruction *MovePos);
+
   //===--------------------------------------------------------------------===//
   // Subclass classification.
   //===--------------------------------------------------------------------===//
@@ -123,9 +128,13 @@ public:
   const char *getOpcodeName() const { return getOpcodeName(getOpcode()); }
   bool isTerminator() const { return isTerminator(getOpcode()); }
   bool isBinaryOp() const { return isBinaryOp(getOpcode()); }
+  bool isIntDivRem() const { return isIntDivRem(getOpcode()); }
   bool isShift() { return isShift(getOpcode()); }
   bool isCast() const { return isCast(getOpcode()); }
   bool isFuncletPad() const { return isFuncletPad(getOpcode()); }
+  bool isExceptionalTerminator() const {
+    return isExceptionalTerminator(getOpcode());
+  }
 
   static const char* getOpcodeName(unsigned OpCode);
 
@@ -135,6 +144,10 @@ public:
 
   static inline bool isBinaryOp(unsigned Opcode) {
     return Opcode >= BinaryOpsBegin && Opcode < BinaryOpsEnd;
+  }
+
+  static inline bool isIntDivRem(unsigned Opcode) {
+    return Opcode == UDiv || Opcode == SDiv || Opcode == URem || Opcode == SRem;
   }
 
   /// Determine if the Opcode is one of the shift instructions.
@@ -170,6 +183,20 @@ public:
   /// Determine if the OpCode is one of the FuncletPadInst instructions.
   static inline bool isFuncletPad(unsigned OpCode) {
     return OpCode >= FuncletPadOpsBegin && OpCode < FuncletPadOpsEnd;
+  }
+
+  /// Returns true if the OpCode is a terminator related to exception handling.
+  static inline bool isExceptionalTerminator(unsigned OpCode) {
+    switch (OpCode) {
+    case Instruction::CatchSwitch:
+    case Instruction::CatchRet:
+    case Instruction::CleanupRet:
+    case Instruction::Invoke:
+    case Instruction::Resume:
+      return true;
+    default:
+      return false;
+    }
   }
 
   //===--------------------------------------------------------------------===//
@@ -279,7 +306,7 @@ public:
   /// Return the debug location for this node as a DebugLoc.
   const DebugLoc &getDebugLoc() const { return DbgLoc; }
 
-  /// Set or clear the nsw flag on this instruction, which must be an operator
+  /// Set or clear the nuw flag on this instruction, which must be an operator
   /// which supports this flag. See LangRef.html for the meaning of this flag.
   void setHasNoUnsignedWrap(bool b = true);
 
@@ -304,10 +331,15 @@ public:
   /// Determine whether the exact flag is set.
   bool isExact() const;
 
-  /// Set or clear the unsafe-algebra flag on this instruction, which must be an
+  /// Set or clear all fast-math-flags on this instruction, which must be an
   /// operator which supports this flag. See LangRef.html for the meaning of
   /// this flag.
-  void setHasUnsafeAlgebra(bool B);
+  void setFast(bool B);
+
+  /// Set or clear the reassociation flag on this instruction, which must be
+  /// an operator which supports this flag. See LangRef.html for the meaning of
+  /// this flag.
+  void setHasAllowReassoc(bool B);
 
   /// Set or clear the no-nans flag on this instruction, which must be an
   /// operator which supports this flag. See LangRef.html for the meaning of
@@ -329,6 +361,11 @@ public:
   /// this flag.
   void setHasAllowReciprocal(bool B);
 
+  /// Set or clear the approximate-math-functions flag on this instruction,
+  /// which must be an operator which supports this flag. See LangRef.html for
+  /// the meaning of this flag.
+  void setHasApproxFunc(bool B);
+
   /// Convenience function for setting multiple fast-math flags on this
   /// instruction, which must be an operator which supports these flags. See
   /// LangRef.html for the meaning of these flags.
@@ -339,8 +376,11 @@ public:
   /// LangRef.html for the meaning of these flags.
   void copyFastMathFlags(FastMathFlags FMF);
 
-  /// Determine whether the unsafe-algebra flag is set.
-  bool hasUnsafeAlgebra() const;
+  /// Determine whether all fast-math-flags are set.
+  bool isFast() const;
+
+  /// Determine whether the allow-reassociation flag is set.
+  bool hasAllowReassoc() const;
 
   /// Determine whether the no-NaNs flag is set.
   bool hasNoNaNs() const;
@@ -357,6 +397,9 @@ public:
   /// Determine whether the allow-contract flag is set.
   bool hasAllowContract() const;
 
+  /// Determine whether the approximate-math-functions flag is set.
+  bool hasApproxFunc() const;
+
   /// Convenience function for getting all the fast-math flags, which must be an
   /// operator which supports these flags. See LangRef.html for the meaning of
   /// these flags.
@@ -372,6 +415,21 @@ public:
   /// Logical 'and' of any supported wrapping, exact, and fast-math flags of
   /// V and this instruction.
   void andIRFlags(const Value *V);
+
+  /// Merge 2 debug locations and apply it to the Instruction. If the
+  /// instruction is a CallIns, we need to traverse the inline chain to find
+  /// the common scope. This is not efficient for N-way merging as each time
+  /// you merge 2 iterations, you need to rebuild the hashmap to find the
+  /// common scope. However, we still choose this API because:
+  ///  1) Simplicity: it takes 2 locations instead of a list of locations.
+  ///  2) In worst case, it increases the complexity from O(N*I) to
+  ///     O(2*N*I), where N is # of Instructions to merge, and I is the
+  ///     maximum level of inline stack. So it is still linear.
+  ///  3) Merging of call instructions should be extremely rare in real
+  ///     applications, thus the N-way merging should be in code path.
+  /// The DebugLoc attached to this instruction will be overwritten by the
+  /// merged DebugLoc.
+  void applyMergedLocation(const DILocation *LocA, const DILocation *LocB);
 
 private:
   /// Return true if we have an entry in the on-the-side metadata hash.
@@ -499,6 +557,14 @@ public:
   /// matters, isSafeToSpeculativelyExecute may be more appropriate.
   bool mayHaveSideEffects() const { return mayWriteToMemory() || mayThrow(); }
 
+  /// Return true if the instruction can be removed if the result is unused.
+  ///
+  /// When constant folding some instructions cannot be removed even if their
+  /// results are unused. Specifically terminator instructions and calls that
+  /// may have side effects cannot be removed without semantically changing the
+  /// generated program.
+  bool isSafeToRemove() const;
+
   /// Return true if the instruction is a variety of EH-block.
   bool isEHPad() const {
     switch (getOpcode()) {
@@ -510,6 +576,14 @@ public:
     default:
       return false;
     }
+  }
+
+  /// Return a pointer to the next non-debug instruction in the same basic
+  /// block as 'this', or nullptr if no such instruction exists.
+  const Instruction *getNextNonDebugInstruction() const;
+  Instruction *getNextNonDebugInstruction() {
+    return const_cast<Instruction *>(
+        static_cast<const Instruction *>(this)->getNextNonDebugInstruction());
   }
 
   /// Create a copy of 'this' instruction that is identical in all ways except
@@ -546,7 +620,7 @@ public:
   /// be identical.
   /// @returns true if the specified instruction is the same operation as
   /// the current one.
-  /// @brief Determine if one instruction is the same operation as another.
+  /// Determine if one instruction is the same operation as another.
   bool isSameOperationAs(const Instruction *I, unsigned flags = 0) const;
 
   /// Return true if there are any uses of this instruction in blocks other than
@@ -554,6 +628,16 @@ public:
   /// operands in the corresponding predecessor block.
   bool isUsedOutsideOfBlock(const BasicBlock *BB) const;
 
+  /// Return the number of successors that this instruction has. The instruction
+  /// must be a terminator.
+  unsigned getNumSuccessors() const;
+
+  /// Return the specified successor. This instruction must be a terminator.
+  BasicBlock *getSuccessor(unsigned Idx) const;
+
+  /// Update the specified successor to point at the provided block. This
+  /// instruction must be a terminator.
+  void setSuccessor(unsigned Idx, BasicBlock *BB);
 
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const Value *V) {

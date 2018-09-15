@@ -16,7 +16,7 @@
 #define LLVM_LIB_TARGET_SPARC_SPARCISELLOWERING_H
 
 #include "Sparc.h"
-#include "llvm/Target/TargetLowering.h"
+#include "llvm/CodeGen/TargetLowering.h"
 
 namespace llvm {
   class SparcSubtarget;
@@ -59,9 +59,9 @@ namespace llvm {
   public:
     SparcTargetLowering(const TargetMachine &TM, const SparcSubtarget &STI);
     SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
-    
+
     bool useSoftFloat() const override;
-    
+
     /// computeKnownBitsForTargetNode - Determine which of the bits specified
     /// in Mask are known to be either zero or one and return them in the
     /// KnownZero/KnownOne bitsets.
@@ -176,7 +176,6 @@ namespace llvm {
     SDValue LowerEH_SJLJ_LONGJMP(SDValue Op, SelectionDAG &DAG,
                                  const SparcTargetLowering &TLI) const ;
 
-    unsigned getSRetArgSize(SelectionDAG &DAG, SDValue Callee) const;
     SDValue withTargetFlags(SDValue Op, unsigned TF, SelectionDAG &DAG) const;
     SDValue makeHiLoPair(SDValue Op, unsigned HiTF, unsigned LoTF,
                          SelectionDAG &DAG) const;
@@ -191,6 +190,13 @@ namespace llvm {
                              const SDLoc &DL, SelectionDAG &DAG) const;
 
     SDValue LowerINTRINSIC_WO_CHAIN(SDValue Op, SelectionDAG &DAG) const;
+
+    SDValue PerformBITCASTCombine(SDNode *N, DAGCombinerInfo &DCI) const;
+
+    SDValue bitcastConstantFPToInt(ConstantFPSDNode *C, const SDLoc &DL,
+                                   SelectionDAG &DAG) const;
+
+    SDValue PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const override;
 
     bool ShouldShrinkFPConstant(EVT VT) const override {
       // Do not shrink FP constpool if VT == MVT::f128.

@@ -18,7 +18,7 @@
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/IR/Function.h"
-#include "llvm/Target/TargetFrameLowering.h"
+#include "llvm/CodeGen/TargetFrameLowering.h"
 
 #include "GBZ80.h"
 #include "GBZ80InstrInfo.h"
@@ -179,7 +179,8 @@ bool GBZ80RegisterInfo::shouldCoalesce(MachineInstr *MI,
                                        unsigned SubReg,
                                        const TargetRegisterClass *DstRC,
                                        unsigned DstSubReg,
-                                       const TargetRegisterClass *NewRC) const {
+                                       const TargetRegisterClass *NewRC,
+                                       LiveIntervals &LIS) const {
   return NewRC != &GB::ARegRegClass;
 }
 

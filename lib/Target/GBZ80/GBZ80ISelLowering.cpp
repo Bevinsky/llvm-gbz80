@@ -657,7 +657,8 @@ void GBZ80TargetLowering::ReplaceNodeResults(SDNode *N,
 /// by AM is legal for this target, for a load/store of the specified type.
 bool GBZ80TargetLowering::isLegalAddressingMode(const DataLayout &DL,
                                               const AddrMode &AM, Type *Ty,
-                                              unsigned AS) const {
+                                              unsigned AS,
+                                              Instruction *I /*= nullptr*/) const {
   int64_t Offs = AM.BaseOffs;
 
   // Allow absolute addresses.
@@ -915,7 +916,7 @@ SDValue GBZ80TargetLowering::LowerFormalArguments(
   CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(), ArgLocs,
                  *DAG.getContext());
 
-  analyzeArguments(nullptr, MF.getFunction(), &DL, 0, &Ins, CallConv, ArgLocs, CCInfo,
+  analyzeArguments(nullptr, &MF.getFunction(), &DL, 0, &Ins, CallConv, ArgLocs, CCInfo,
                    false, isVarArg);
 
   SDValue ArgValue;
@@ -1264,7 +1265,7 @@ GBZ80TargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
 
   // Don't emit the ret/reti instruction when the naked attribute is present in
   // the function being compiled.
-  if (MF.getFunction()->getAttributes().hasAttribute(
+  if (MF.getFunction().getAttributes().hasAttribute(
           AttributeList::FunctionIndex, Attribute::Naked)) {
     return Chain;
   }

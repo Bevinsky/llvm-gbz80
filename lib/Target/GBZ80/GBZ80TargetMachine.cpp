@@ -36,18 +36,28 @@ static StringRef getCPU(StringRef CPU) {
   return CPU;
 }
 
-static Reloc::Model getEffectiveRelocModel(Optional<Reloc::Model> RM) {
+static Reloc::Model getEffectiveRelocModel(const Triple &TT,
+                                           Optional<Reloc::Model> RM) {
   return RM.hasValue() ? *RM : Reloc::Static;
+}
+
+static CodeModel::Model getEffectiveCodeModel(Optional<CodeModel::Model> CM,
+                                              bool JIT) {
+  return CM.hasValue() ? *CM : CodeModel::Small;
 }
 
 GBZ80TargetMachine::GBZ80TargetMachine(const Target &T, const Triple &TT,
                                    StringRef CPU, StringRef FS,
                                    const TargetOptions &Options,
-                                   Optional<Reloc::Model> RM, CodeModel::Model CM,
-                                   CodeGenOpt::Level OL)
+                                   Optional<Reloc::Model> RM,
+                                   Optional<CodeModel::Model> CM,
+                                   CodeGenOpt::Level OL, bool JIT)
     : LLVMTargetMachine(
           T, GBZ80DataLayout, TT,
-          getCPU(CPU), FS, Options, getEffectiveRelocModel(RM), CM, OL),
+          getCPU(CPU), FS, Options,
+          getEffectiveRelocModel(TT, RM),
+          getEffectiveCodeModel(CM, JIT),
+          OL),
       SubTarget(TT, getCPU(CPU), FS, *this) {
   this->TLOF = make_unique<GBZ80TargetObjectFile>();
   initAsmInfo();

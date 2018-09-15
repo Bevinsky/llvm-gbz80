@@ -68,7 +68,8 @@ static MCInstPrinter *createGBZ80MCInstPrinter(const Triple &T,
 static MCStreamer *createMCStreamer(const Triple &T, MCContext &Context,
                                     MCAsmBackend &MAB, raw_pwrite_stream &OS,
                                     MCCodeEmitter *Emitter, bool RelaxAll) {
-  return createELFStreamer(Context, MAB, OS, Emitter, RelaxAll);
+  return nullptr;
+  //return createELFStreamer(Context, MAB, OS, Emitter, RelaxAll); // $HACK $MS: commented
 }
 
 static MCTargetStreamer *
@@ -105,17 +106,17 @@ extern "C" void LLVMInitializeGBZ80TargetMC() {
   TargetRegistry::RegisterMCCodeEmitter(getTheGBZ80Target(), createGBZ80MCCodeEmitter);
 
   // Register the ELF streamer
-  TargetRegistry::RegisterELFStreamer(getTheGBZ80Target(), createMCStreamer);
+  //TargetRegistry::RegisterELFStreamer(getTheGBZ80Target(), createMCStreamer); // $HACK $MS: commented
 
   // Register the obj target streamer.
-  TargetRegistry::RegisterObjectTargetStreamer(getTheGBZ80Target(),
-                                               createGBZ80ObjectTargetStreamer);
+  //TargetRegistry::RegisterObjectTargetStreamer(getTheGBZ80Target(), // $HACK $MS: commented
+  //                                             createGBZ80ObjectTargetStreamer);
 
   // Register the asm target streamer.
   TargetRegistry::RegisterAsmTargetStreamer(getTheGBZ80Target(),
                                             createMCAsmTargetStreamer);
 
   // Register the asm backend (as little endian).
-  TargetRegistry::RegisterMCAsmBackend(getTheGBZ80Target(), createGBZ80AsmBackend);
+  // TargetRegistry::RegisterMCAsmBackend(getTheGBZ80Target(), createGBZ80AsmBackend); // $HACK $MS: commented
 }
 
