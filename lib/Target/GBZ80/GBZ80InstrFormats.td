@@ -66,7 +66,7 @@ class Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
 class ExtensionPseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
   : Pseudo<outs, ins, asmstr, pattern>
 {
-  let Defs = [rF];
+  let Defs = [RF];
 }
 
 class StorePseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
@@ -80,8 +80,8 @@ class SelectPseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
 {
   let usesCustomInserter = 1;
 
-  let Uses = [rF];
-  let Defs = [rF]; 
+  let Uses = [RF];
+  let Defs = [RF];
 }
 
 class ShiftPseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
@@ -89,6 +89,6 @@ class ShiftPseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
 {
   let usesCustomInserter = 1;
 
-  let Defs = [rF];
+  let Defs = [RF];
 }
 

@@ -31,39 +31,34 @@ let Namespace = "GB" in
 {
   def sub_lo : SubRegIndex<8>;
   def sub_hi : SubRegIndex<8, 8>;
-
-  def sub_z  : SubRegIndex<1, 7>;
-  def sub_n  : SubRegIndex<1, 6>;
-  def sub_h  : SubRegIndex<1, 5>;
-  def sub_c  : SubRegIndex<1, 4>;
 }
 
 // 8-bit registers.
 let CostPerUse = 0 in
-def rA : GBZ80Reg<7,  "A">;
+def RA : GBZ80Reg<7,  "A">;
 let CostPerUse = 1 in {
-  def rB : GBZ80Reg<0,  "B">;
-  def rC : GBZ80Reg<1,  "C">;
-  def rD : GBZ80Reg<2,  "D">;
-  def rE : GBZ80Reg<3,  "E">;
+  def RB : GBZ80Reg<0,  "B">;
+  def RC : GBZ80Reg<1,  "C">;
+  def RD : GBZ80Reg<2,  "D">;
+  def RE : GBZ80Reg<3,  "E">;
 }
 let CostPerUse = 2 in {
-  def rH : GBZ80Reg<4,  "H">;
-  def rL : GBZ80Reg<5,  "L">;
+  def RH : GBZ80Reg<4,  "H">;
+  def RL : GBZ80Reg<5,  "L">;
 }
 
 // Flags.
-def rF : GBZ80Reg<6,  "F">;
+def RF : GBZ80Reg<6,  "F">;
 
 // 16-bit registers.
 let SubRegIndices = [sub_hi, sub_lo],
     CoveredBySubRegs = 1 in {
-  def rHL : GBZ80Reg<2, "HL", [rH, rL]>;
+  def RHL : GBZ80Reg<2, "HL", [RH, RL]>;
   let CostPerUse = 1 in {
-    def rBC : GBZ80Reg<0, "BC", [rB, rC]>;
-    def rDE : GBZ80Reg<1, "DE", [rD, rE]>;
+    def RBC : GBZ80Reg<0, "BC", [RB, RC]>;
+    def RDE : GBZ80Reg<1, "DE", [RD, RE]>;
   }
-  def rAF : GBZ80Reg<3, "AF", [rA, rF]>;
+  def RAF : GBZ80Reg<3, "AF", [RA, RF]>;
 }
 
 // Stack pointer
@@ -76,28 +71,26 @@ def IME : GBZ80Reg<0, "IME">;
 // Register Classes
 //===----------------------------------------------------------------------===//
 
-def AReg : RegisterClass<"GB", [i8], 8,
-  (add rA)>;
-def CReg : RegisterClass<"GB", [i8], 8,
-  (add rC)>;
-def GPR8 : RegisterClass<"GB", [i8], 8,
-  (add rA, rB, rC, rD, rE, rH, rL)>;
+def R8 : RegisterClass<"GB", [i8], 8,
+  (add RA, RB, RC, RD, RE, RH, RL)>;
+def R8_GPR : RegisterClass<"GB", [i8], 8,
+  (add RB, RC, RD, RE, RH, RL)>;
 
-def BCDEPairs : RegisterClass<"GB", [i16], 8,
-  (add rBC, rDE)>;
-def HLPairs : RegisterClass<"GB", [i16], 8,
-  (add rHL)>;
-def Pairs : RegisterClass<"GB", [i16], 8,
-  (add rHL, rBC, rDE)>;
+def R16_BCDE : RegisterClass<"GB", [i16], 8,
+  (add RBC, RDE)>;
+def R16_HL : RegisterClass<"GB", [i16], 8,
+  (add RHL)>;
+def R16 : RegisterClass<"GB", [i16], 8,
+  (add RHL, RBC, RDE)>;
 
 let isAllocatable = 0 in {
-  def AllPairs : RegisterClass<"GB", [i16], 8,
-    (add rHL, rBC, rDE, rAF)>;
-  def DDPairs : RegisterClass<"GB", [i16], 8,
-    (add rHL, rBC, rDE, SP)>;
+  def R16_All : RegisterClass<"GB", [i16], 8,
+    (add RHL, RBC, RDE, RAF)>;
+  def R16_DD : RegisterClass<"GB", [i16], 8,
+    (add RHL, RBC, RDE, SP)>;
 }
 
 let CopyCost = -1 in
 def Flag : RegisterClass<"GB", [i8], 8,
-  (add rF)>;
+  (add RF)>;
 

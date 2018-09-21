@@ -70,14 +70,13 @@ const TargetRegisterClass *
 GBZ80RegisterInfo::getLargestLegalSuperClass(const TargetRegisterClass *RC,
                                            const MachineFunction &MF) const {
   const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
-  if (RC == &GB::ARegRegClass || RC == &GB::CRegRegClass ||
-      RC == &GB::GPR8RegClass) {
-    return &GB::GPR8RegClass;
+  if (RC == &GB::R8_GPRRegClass || RC == &GB::R8RegClass) {
+    return &GB::R8RegClass;
   }
 
-  if (RC == &GB::HLPairsRegClass || RC == &GB::BCDEPairsRegClass ||
-      RC == &GB::PairsRegClass) {
-    return &GB::PairsRegClass;
+  if (RC == &GB::R16_HLRegClass || RC == &GB::R16_BCDERegClass ||
+      RC == &GB::R16RegClass) {
+    return &GB::R16RegClass;
   }
 
   return RC;
@@ -162,15 +161,15 @@ unsigned GBZ80RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
 const TargetRegisterClass *
 GBZ80RegisterInfo::getPointerRegClass(const MachineFunction &MF,
                                     unsigned Kind) const {
-  return &GB::PairsRegClass;
+  return &GB::R16RegClass;
 }
 
 const TargetRegisterClass *
 GBZ80RegisterInfo::getCrossCopyRegClass(const TargetRegisterClass *RC) const {
-  if (RC == &GB::ARegRegClass || RC == &GB::CRegRegClass)
-    return &GB::GPR8RegClass;
-  else if (RC == &GB::HLPairsRegClass || RC == &GB::BCDEPairsRegClass)
-    return &GB::PairsRegClass;
+  if (RC == &GB::R8_GPRRegClass)
+    return &GB::R8RegClass;
+  else if (RC == &GB::R16_HLRegClass || RC == &GB::R16_BCDERegClass)
+    return &GB::R16RegClass;
   return RC;
 }
 
@@ -181,13 +180,13 @@ bool GBZ80RegisterInfo::shouldCoalesce(MachineInstr *MI,
                                        unsigned DstSubReg,
                                        const TargetRegisterClass *NewRC,
                                        LiveIntervals &LIS) const {
-  return NewRC != &GB::ARegRegClass;
+  return true;
 }
 
 void GBZ80RegisterInfo::splitReg(unsigned Reg,
                                unsigned &LoReg,
                                unsigned &HiReg) const {
-    assert(GB::PairsRegClass.contains(Reg) && "can only split 16-bit registers");
+    assert(GB::R16RegClass.contains(Reg) && "can only split 16-bit registers");
 
     LoReg = getSubReg(Reg, GB::sub_lo);
     HiReg = getSubReg(Reg, GB::sub_hi);

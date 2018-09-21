@@ -53,6 +53,7 @@ private:
   bool expandPostRAPseudos();
   MachineInstr *expandPseudo(MachineInstr &);
   MachineInstr *expand8BitLDST(MachineInstr &);
+  MachineInstr *expand8BitArith(MachineInstr &, unsigned NewOpc);
 };
 
 char GBZ80PostRA::ID = 0;
@@ -70,30 +71,20 @@ char GBZ80PostRA::ID = 0;
 // LD_A_HLD
 // LD_A_dd
 static unsigned getOpcodeforLDST(bool isStore, bool isPostInc, bool isPostDec,
-  unsigned PtrReg, bool &IsPostOpc) {
+  unsigned PtrReg, bool PostPtrDead, bool &IsPostOpc) {
   IsPostOpc = false;
   if (isStore) {
-    if (PtrReg != GB::rHL)
-      return GB::LD_dd_A;
-    else if (isPostInc) {
+    if (PtrReg == GB::RHL && !PostPtrDead && (isPostInc || isPostDec)) {
       IsPostOpc = true;
-      return GB::LD_HLI_A;
-    } else if (isPostDec) {
-      IsPostOpc = true;
-      return GB::LD_HLD_A;
+      return isPostInc ? GB::LD_HLI_A : GB::LD_HLD_A;
     }
-    return GB::LD_HL_r;
+    return GB::LD8_nn;
   } else {
-    if (PtrReg != GB::rHL)
-      return GB::LD_A_dd;
-    else if (isPostInc) {
+    if (PtrReg == GB::RHL && !PostPtrDead && (isPostInc || isPostDec)) {
       IsPostOpc = true;
-      return GB::LD_A_HLI;
-    } else if (isPostDec) {
-      IsPostOpc = true;
-      return GB::LD_A_HLD;
+      return isPostInc ? GB::LD_A_HLI : GB::LD_A_HLD;
     }
-    return GB::LD_r_HL;
+    return GB::ST8_nn;
   }
 }
 
@@ -121,17 +112,33 @@ MachineInstr *GBZ80PostRA::expand8BitLDST(MachineInstr &MI) {
   MachineInstr *New = nullptr;
   bool isPostOpc;
   unsigned opcode =
-    getOpcodeforLDST(isStore, isPostInc, isPostDec, InPtrReg, isPostOpc);
+    getOpcodeforLDST(isStore, isPostInc, isPostDec, InPtrReg, PostPtrDead, isPostOpc);
+
   // Assemble the instruction. Postloads have the operands swapped.
   // No need to emit postupdate if it's dead.
+  // Be sure to respect restrictions.
+  //  if ptr == HL && !post then any op value reg is fine.
+  //  Otherwise, the op value reg must be A.
+  // FIXME: Do we need to update some kind of liveinterval if we do this?
+  unsigned OpValueReg = (InPtrReg == GB::RHL && !isPostOpc) ? ValueReg : GB::RA;
+
+  if (isStore && OpValueReg != ValueReg)
+    // Copy to A before storing.
+    // FIXME: Flags? Liveranges?
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), OpValueReg)
+      .addReg(ValueReg);
+
   auto Builder = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(opcode));
-  if (isPostOpc && !PostPtrDead && !isStore)
-    Builder.addReg(PostPtrReg, RegState::Define)
-           .addReg(ValueReg, RegState::Define);
+  if (isPostOpc && !isStore)
+    // For postop loads, add both the value and postptr defs.
+    Builder.addReg(OpValueReg, RegState::Define)
+           .addReg(PostPtrReg, RegState::Define | getDeadRegState(PostPtrDead));
   else {
-    if (isPostOpc && !PostPtrDead)
-      Builder.addReg(PostPtrReg, RegState::Define);
-    Builder.addReg(ValueReg, getDefRegState(!isStore));
+    // For stores and normal loads, if it's postop, add the def, otherwise
+    // just add the value operand (either def or use).
+    if (isPostOpc)
+      Builder.addReg(PostPtrReg, RegState::Define | getDeadRegState(PostPtrDead));
+    Builder.addReg(OpValueReg, getDefRegState(!isStore));
   }
   // Don't add the kill flag if we're going to postupdate manually.
   Builder.addReg(InPtrReg, getKillRegState(InPtrKill &&
@@ -140,6 +147,14 @@ MachineInstr *GBZ80PostRA::expand8BitLDST(MachineInstr &MI) {
   for (auto &MMO : MI.memoperands())
     Builder.addMemOperand(MMO);
   New = Builder;
+
+  if (!isStore && OpValueReg != ValueReg) {
+    // Copy from A after loading.
+    // FIXME: does it matter if we do this before or after the postupdate below?
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), ValueReg)
+      .addReg(OpValueReg, getKillRegState(true));
+  }
+
   if (isPost && !isPostOpc && !PostPtrDead) {
     // If this is a postop but we didn't get a post opcode, we need to emit the
     // postupdate separately, unless the postupdate def is dead.
@@ -147,9 +162,44 @@ MachineInstr *GBZ80PostRA::expand8BitLDST(MachineInstr &MI) {
     Builder =
       BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(opcode))
       .addReg(PostPtrReg, RegState::Define)
-      .addReg(InPtrReg);
+      .addReg(InPtrReg, getKillRegState(InPtrKill));
     New = Builder;
   }
+  return New;
+}
+
+MachineInstr *GBZ80PostRA::expand8BitArith(MachineInstr &MI,
+                                           unsigned NewOpc) {
+  unsigned DstReg = MI.getOperand(0).getReg();
+  bool DstIsDead = MI.getOperand(0).isDead();
+  unsigned RHSIsReg = MI.getOperand(2).isReg();
+  unsigned RHSReg = RHSIsReg ? MI.getOperand(2).getReg() : 0;
+  bool RHSIsKill = RHSIsReg ? MI.getOperand(2).isKill() : false;
+  int8_t RHSImm = !RHSIsReg ? MI.getOperand(2).getImm() : 0;
+
+  // Copy the LHS to A. It won't be A at this point.
+  // XXX: Isn't this guaranteed to be kill because of the tie?
+  BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r), GB::RA)
+    .addReg(DstReg);
+
+  // If the def is dead in the original instr, that means it's dead on
+  // this one. The RA use is kill.
+  auto &B = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(NewOpc))
+    .addReg(GB::RA, RegState::Define | getDeadRegState(DstIsDead))
+    .addReg(GB::RA, RegState::Kill);
+  if (RHSIsReg)
+    B.addReg(RHSReg, getKillRegState(RHSIsKill));
+  else
+    B.addImm(RHSImm);
+
+  MachineInstr *New = B;
+  // If the dst isn't dead, copy it back to the real dst. The RA
+  // use is kill.
+  if (!DstIsDead)
+    New = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r))
+      .addReg(DstReg, RegState::Define)
+      .addReg(GB::RA, RegState::Kill);
+
   return New;
 }
 
@@ -164,6 +214,41 @@ MachineInstr *GBZ80PostRA::expandPseudo(MachineInstr &MI) {
   case GB::LD8_DEC:
   case GB::ST8_DEC:
     return expand8BitLDST(MI);
+
+  case GB::ADD8r:
+    return expand8BitArith(MI, GB::ADD_r);
+  case GB::ADD8i:
+    return expand8BitArith(MI, GB::ADD_n);
+
+  case GB::ADC8r:
+    return expand8BitArith(MI, GB::ADC_r);
+  case GB::ADC8i:
+    return expand8BitArith(MI, GB::ADC_n);
+
+  case GB::SUB8r:
+    return expand8BitArith(MI, GB::SUB_r);
+  case GB::SUB8i:
+    return expand8BitArith(MI, GB::SUB_n);
+
+  case GB::SBC8r:
+    return expand8BitArith(MI, GB::SBC_r);
+  case GB::SBC8i:
+    return expand8BitArith(MI, GB::SBC_n);
+
+  case GB::AND8r:
+    return expand8BitArith(MI, GB::AND_r);
+  case GB::AND8i:
+    return expand8BitArith(MI, GB::AND_n);
+
+  case GB::OR8r:
+    return expand8BitArith(MI, GB::OR_r);
+  case GB::OR8i:
+    return expand8BitArith(MI, GB::OR_n);
+
+  case GB::XOR8r:
+    return expand8BitArith(MI, GB::XOR_r);
+  case GB::XOR8i:
+    return expand8BitArith(MI, GB::XOR_n);
   }
 
   return LastNew;
@@ -178,6 +263,7 @@ bool GBZ80PostRA::expandPostRAPseudos() {
       if (New) {
         MII->eraseFromParent();
         MII = New->getIterator();
+        Modified = true;
       }
       ++MII;
     }

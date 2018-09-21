@@ -34,8 +34,8 @@ namespace llvm {
 GBZ80TargetLowering::GBZ80TargetLowering(GBZ80TargetMachine &tm)
     : TargetLowering(tm) {
   // Set up the register classes.
-  addRegisterClass(MVT::i8, &GB::GPR8RegClass);
-  addRegisterClass(MVT::i16, &GB::PairsRegClass);
+  addRegisterClass(MVT::i8, &GB::R8_GPRRegClass);
+  addRegisterClass(MVT::i16, &GB::R16RegClass);
 
   // Compute derived properties from the register classes.
   computeRegisterProperties(tm.getSubtargetImpl()->getRegisterInfo());
@@ -801,9 +801,9 @@ static void analyzeStandardArguments(TargetLowering::CallLoweringInfo *CLI,
                                      SmallVectorImpl<CCValAssign> &ArgLocs,
                                      CCState &CCInfo, bool IsCall, bool IsVarArg) {
   static const MCPhysReg RegList8[] =
-  { GB::rA, GB::rB, GB::rC, GB::rD, GB::rE, GB::rH, GB::rL };
+  { GB::RA, GB::RB, GB::RC, GB::RD, GB::RE, GB::RH, GB::RL };
   static const MCPhysReg RegList16[] =
-  { GB::rBC, GB::rHL, GB::rDE };
+  { GB::RBC, GB::RHL, GB::RDE };
   if (IsVarArg) {
     // Variadic functions do not need all the analisys below.
     if (IsCall) {
@@ -927,9 +927,9 @@ SDValue GBZ80TargetLowering::LowerFormalArguments(
       EVT RegVT = VA.getLocVT();
       const TargetRegisterClass *RC;
       if (RegVT == MVT::i8) {
-        RC = &GB::GPR8RegClass;
+        RC = &GB::R8_GPRRegClass;
       } else if (RegVT == MVT::i16) {
-        RC = &GB::PairsRegClass;
+        RC = &GB::R16RegClass;
       } else {
         llvm_unreachable("Unknown argument type!");
       }
@@ -1304,43 +1304,43 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
     llvm_unreachable("Invalid shift opcode!");
   case GB::IselLsl8:
     Opc = GB::SLA_r;
-    RC = &GB::GPR8RegClass;
+    RC = &GB::R8_GPRRegClass;
     break;
   case GB::IselLsl16:
     Opc = GB::SHL16;
-    RC = &GB::PairsRegClass;
+    RC = &GB::R16RegClass;
     break;
   case GB::IselAsr8:
     Opc = GB::SRA_r;
-    RC = &GB::GPR8RegClass;
+    RC = &GB::R8_GPRRegClass;
     break;
   case GB::IselAsr16:
     Opc = GB::ASR16;
-    RC = &GB::PairsRegClass;
+    RC = &GB::R16RegClass;
     break;
   case GB::IselLsr8:
     Opc = GB::SRL_r;
-    RC = &GB::GPR8RegClass;
+    RC = &GB::R8_GPRRegClass;
     break;
   case GB::IselLsr16:
     Opc = GB::LSR16;
-    RC = &GB::PairsRegClass;
+    RC = &GB::R16RegClass;
     break;
   case GB::IselRol8:
     Opc = GB::RLC_r;
-    RC = &GB::GPR8RegClass;
+    RC = &GB::R8_GPRRegClass;
     break;
   case GB::IselRol16:
     Opc = GB::ROL16;
-    RC = &GB::PairsRegClass;
+    RC = &GB::R16RegClass;
     break;
   case GB::IselRor8:
     Opc = GB::RRC_r;
-    RC = &GB::GPR8RegClass;
+    RC = &GB::R8_GPRRegClass;
     break;
   case GB::IselRor16:
     Opc = GB::ROR16;
-    RC = &GB::PairsRegClass;
+    RC = &GB::R16RegClass;
     break;
   }
 
@@ -1369,8 +1369,8 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
   LoopBB->addSuccessor(RemBB);
   LoopBB->addSuccessor(LoopBB);
 
-  unsigned ShiftAmtReg = RI.createVirtualRegister(&GB::GPR8RegClass);
-  unsigned ShiftAmtReg2 = RI.createVirtualRegister(&GB::GPR8RegClass);
+  unsigned ShiftAmtReg = RI.createVirtualRegister(&GB::R8_GPRRegClass);
+  unsigned ShiftAmtReg2 = RI.createVirtualRegister(&GB::R8_GPRRegClass);
   unsigned ShiftReg = RI.createVirtualRegister(RC);
   unsigned ShiftReg2 = RI.createVirtualRegister(RC);
   unsigned ShiftAmtSrcReg = MI.getOperand(2).getReg();
@@ -1412,6 +1412,7 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
       .addMBB(LoopBB);
 
   MI.eraseFromParent(); // The pseudo instruction is gone now.
+  F->getProperties().reset(MachineFunctionProperties::Property::NoPHIs);
   return RemBB;
 }
 

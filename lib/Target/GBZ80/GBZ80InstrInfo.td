@@ -228,7 +228,7 @@ def toHi      : OutPatFrag<(ops node:$in),
 def toLo      : OutPatFrag<(ops node:$in),
   (i8 (EXTRACT_SUBREG (i16 $in), sub_lo))>;
 def buildPair : OutPatFrag<(ops node:$hi, node:$lo),
-  (i16 (REG_SEQUENCE Pairs, (i8 $hi), sub_hi, (i8 $lo), sub_lo))>;
+  (i16 (REG_SEQUENCE R16, (i8 $hi), sub_hi, (i8 $lo), sub_lo))>;
 
 
 //===----------------------------------------------------------------------===//
@@ -255,7 +255,7 @@ def GBZ80_COND_C  : PatLeaf<(i8 3)>;
 // pointer before prolog-epilog rewriting occurs.
 // Pessimistically assume ADJCALLSTACKDOWN / ADJCALLSTACKUP will become
 // sub / add which can clobber SREG.
-let Defs = [SP, rF],
+let Defs = [SP, RF],
 Uses = [SP] in
 {
   def ADJCALLSTACKDOWN : Pseudo<(outs),
@@ -274,21 +274,21 @@ Uses = [SP] in
 ///===============================
 
 let isAsCheapAsAMove = 1 in
-def LD_r_r : I8<(outs GPR8:$dst), (ins GPR8:$src),
+def LD_r_r : I8<(outs R8:$dst), (ins R8:$src),
   "LD\t$dst, $src",
   []>;
 
 let isMoveImm = 1, isReMaterializable = 1 in {
-  def LD_r_n : I16<(outs GPR8:$dst), (ins imm8:$imm),
+  def LD_r_n : I16<(outs R8:$dst), (ins imm8:$imm),
     "LD\t$dst, $imm",
-    [(set GPR8:$dst, imm8:$imm)]>;
+    [(set R8:$dst, imm8:$imm)]>;
 
-  def LD_dd_nn : I24<(outs DDPairs:$dst), (ins imm16:$imm),
+  def LD_dd_nn : I24<(outs R16_DD:$dst), (ins imm16:$imm),
     "LD\t$dst, $imm",
-    [(set DDPairs:$dst, imm16:$imm)]>;
+    [(set R16_DD:$dst, imm16:$imm)]>;
 }
 
-let Defs = [SP], Uses = [rHL] in
+let Defs = [SP], Uses = [RHL] in
 def LD_SP_HL : I8<(outs), (ins),
   "LD\tSP, HL",
   []>;
@@ -297,110 +297,135 @@ def LD_SP_HL : I8<(outs), (ins),
 /// Loads
 ///===============================
 
+// LD r, [dd]
 let mayLoad = 1 in {
-  def LD8 : Pseudo<(outs AReg:$dst), (ins Pairs:$ptr),
+  let Defs = [RA] in
+  def LD8 : Pseudo<(outs R8:$dst), (ins R16:$ptr),
     "LD8\t$dst, [$ptr]",
     [(set i8:$dst, (load i16:$ptr))]>;
 
-  let Constraints = "$ptr = $post" in {
-    def LD8_INC : Pseudo<(outs AReg:$dst, Pairs:$post), (ins Pairs:$ptr),
+  // Restricted to:
+  //   LD A, [BC]
+  //   LD A, [DE]
+  //   LD r, [HL]
+  def LD_r_dd : I8<(outs R8:$dst), (ins R16:$src),
+    "LD\t$dst, [$src]",
+    []>;
+}
+
+// LD r, [dd+-]
+let mayLoad = 1, Constraints = "$ptr = $post" in {
+  let Defs = [RA] in {
+    def LD8_INC : Pseudo<(outs R8:$dst, R16:$post), (ins R16:$ptr),
       "LD8\t$dst, [$ptr+]",
       []>;
 
-    def LD8_DEC : Pseudo<(outs AReg:$dst, Pairs:$post), (ins Pairs:$ptr),
+    def LD8_DEC : Pseudo<(outs R8:$dst, R16:$post), (ins R16:$ptr),
       "LD8\t$dst, [$ptr-]",
       []>;
   }
+
+  // Restricted to:
+  //   LD [HL+], A
+  //   LD [HL-], A
+  def LD_A_HLI : I8<(outs R8:$dst, R16_HL:$post), (ins R16_HL:$ptr),
+    "LD\t$dst, [$ptr+]",
+    []>;
+  def LD_A_HLD : I8<(outs R8:$dst, R16_HL:$post), (ins R16_HL:$ptr),
+    "LD\t$dst, [$ptr-]",
+    []>;
 }
 
-// Real instructions below.
+// LD r, [nn]
+let mayLoad = 1 in {
+  let Defs = [RA] in
+  def LD8_nn : Pseudo<(outs R8:$dst), (ins uimm16:$addr),
+    "LD8\t$dst, [$addr]",
+    [(set R8:$dst, (load imm:$addr))]>;
+
+  // Restricted to:
+  //   LD A, [nn]
+  def LD_r_nn : I24<(outs R8:$src), (ins uimm16:$addr),
+    "LD\t$src, [$addr]",
+    []>;
+}
 
 let mayLoad = 1 in
-def LD_r_HL : I8<(outs GPR8:$dst), (ins HLPairs:$src),
-  "LD\t$dst, [HL]",
+def LDH_A_C : I8<(outs R8:$dst), (ins R8:$reg),
+  "LD\t$dst, [$$FF00+$reg]",
   []>;
 
 let mayLoad = 1 in
-def LD_A_dd : I8<(outs AReg:$dst), (ins BCDEPairs:$ptr),
-  "LD\tA, [$ptr]",
-  []>;
-
-let mayLoad = 1 in
-def LDH_A_C : I8<(outs AReg:$dst), (ins CReg:$reg),
-  "LD\t$dst, [$$FF00+C]",
-  []>;
-
-let mayLoad = 1 in
-def LDH_A_n : I16<(outs AReg:$dst), (ins imm8:$offs),
+def LDH_A_n : I16<(outs), (ins imm8:$offs),
   "LDH\tA, [$$FF00+$offs]",
-  [(set AReg:$dst, (load HRAMImmAddr:$offs))]>;
-
-let mayLoad = 1 in
-def LD_A_nn : I24<(outs AReg:$dst), (ins uimm16:$addr),
-  "LD\tA, [$addr]",
-  [(set AReg:$dst, (load imm:$addr))]>;
-
-let Constraints = "$ptr = $post", mayLoad = 1 in {
-  def LD_A_HLI : I8<(outs AReg:$dst, HLPairs:$post), (ins HLPairs:$ptr),
-    "LD\tA, [HL+]",
-    []>;
-  def LD_A_HLD : I8<(outs AReg:$dst, HLPairs:$post), (ins HLPairs:$ptr),
-    "LD\tA, [HL-]",
-    []>;
-}
-
-
+  []>;
 
 
 ///===============================
 /// Stores
 ///===============================
 
+// LD [DD], r
 let mayStore = 1 in {
-  def ST8 : Pseudo<(outs), (ins AReg:$src, Pairs:$ptr),
+  let Defs = [RA] in
+  def ST8 : Pseudo<(outs), (ins R8:$src, R16:$ptr),
     "ST8\t[$ptr], $src",
     [(store i8:$src, i16:$ptr)]>;
 
-  let Constraints = "$ptr = $post" in {
-    def ST8_INC : Pseudo<(outs Pairs:$post), (ins AReg:$src, Pairs:$ptr),
+  // Restricted to:
+  //   LD [BC], A
+  //   LD [DE], A
+  //   LD [HL], r
+  def LD_dd_r : I8<(outs), (ins R8:$src, R16:$ptr),
+    "LD\t[$ptr], $src",
+    []>;
+}
+
+// LD [dd+-], r
+let mayStore = 1, Constraints = "$ptr = $post" in {
+  let Defs = [RA] in {
+    def ST8_INC : Pseudo<(outs R16:$post), (ins R8:$src, R16:$ptr),
       "ST8\t[$ptr+], $src",
       []>;
 
-    def ST8_DEC : Pseudo<(outs Pairs:$post), (ins AReg:$src, Pairs:$ptr),
+    def ST8_DEC : Pseudo<(outs R16:$post), (ins R8:$src, R16:$ptr),
       "ST8\t[$ptr-], $src",
       []>;
   }
+
+  // Restricted to:
+  //   LD [HL+], A
+  //   LD [HL-], A
+  def LD_HLI_A : I8<(outs R16_HL:$post), (ins R8:$src, R16_HL:$ptr),
+    "LD\t[$ptr+], $src",
+    []>;
+  def LD_HLD_A : I8<(outs R16_HL:$post), (ins R8:$src, R16_HL:$ptr),
+    "LD\t[$ptr-], $src",
+    []>;
 }
 
+// LD [nn], r
+let mayStore = 1 in {
+  let Defs = [RA] in
+  def ST8_nn : Pseudo<(outs), (ins R8:$src, uimm16:$addr),
+    "ST8\t[$addr], $src",
+    [(store R8:$src, imm:$addr)]>;
+
+  // Restricted to:
+  //   LD [nn], A
+  def LD_nn_r : I24<(outs), (ins R8:$src, uimm16:$addr),
+    "LD\t[$addr], $src",
+    []>;
+}
 
 let mayStore = 1 in
-def LD_HL_r : I8<(outs), (ins GPR8:$src, HLPairs:$ptr),
-  "LD\t[HL], $src",
+def LDH_C_A : I8<(outs), (ins R8:$src, R8:$reg),
+  "LD\t[$$FF00+$reg], $src",
   []>;
 
 let mayStore = 1 in
-def LD_HL_n : I16<(outs), (ins imm8:$imm, HLPairs:$ptr),
-  "LD\t[HL], $imm",
-  []>;
-
-let mayStore = 1 in
-def LDH_C_A : I8<(outs), (ins AReg:$src, CReg:$reg),
-  "LD\t[$$FF00+C], A",
-  []>;
-
-let mayStore = 1 in
-def LDH_n_A : I16<(outs), (ins AReg:$src, imm8:$offs),
+def LDH_n_A : I16<(outs), (ins R8:$src, imm8:$offs),
   "LDH\t[$$FF00+$offs], A",
-  [(store AReg:$src, HRAMImmAddr:$offs)]>;
-
-let mayStore = 1 in
-def LD_nn_A : I24<(outs), (ins AReg:$src, uimm16:$addr),
-  "LD\t[$addr], A",
-  [(store AReg:$src, imm:$addr)]>;
-
-let mayStore = 1 in
-def LD_dd_A : I8<(outs), (ins AReg:$src, BCDEPairs:$ptr),
-  "LD\t[$ptr], A",
   []>;
 
 let Uses = [SP], mayStore = 1 in
@@ -408,14 +433,6 @@ def LD_nn_SP : I24<(outs), (ins uimm16:$addr),
   "LD\t[$addr], SP",
   []>;
 
-let Constraints = "$ptr = $post", mayStore = 1 in {
-  def LD_HLI_A : I8<(outs HLPairs:$post), (ins AReg:$src, HLPairs:$ptr),
-    "LD\t[HL+], A",
-    []>;
-  def LD_HLD_A : I8<(outs HLPairs:$post), (ins AReg:$src, HLPairs:$ptr),
-    "LD\t[HL-], A",
-    []>;
-}
 
 ///===============================
 /// Push and pop
@@ -423,89 +440,113 @@ let Constraints = "$ptr = $post", mayStore = 1 in {
 
 let Defs = [SP], Uses = [SP] in {
   let mayStore = 1 in
-  def PUSH : I8<(outs), (ins AllPairs:$src),
+  def PUSH : I8<(outs), (ins R16_All:$src),
     "PUSH\t$src",
     []>;
   
   let mayLoad = 1 in
-  def POP : I8<(outs AllPairs:$dst), (ins),
+  def POP : I8<(outs R16_All:$dst), (ins),
     "POP\t$dst",
     []>;
 }
-
-
-
-
-
-
-
-
 
 
 ///===============================
 /// Arithmetic operations 
 ///===============================
 
-/// It also defines a set of pseudoops for the operation, which take generic 8-
-/// and 16-bit registers and immediates. These pseudos are two-address.
+/// This multiclass defines a bunch of pseudos and real instructions
+/// based on the op that is passed in.
 ///   OP8r
 ///   OP8i
+///   OP_n
+///   OP_r
+///   OP_HL
 ///   OP16r
 ///   OP16i
 multiclass ALUOp<string Name, SDNode MatchOp, list<Register> ExtraUses = [],
                  bit IsComm = 0> {
-  let Uses = ExtraUses, Defs = [rF], Constraints = "$dst = $a" in {
+  // 8-bit pseudos.
+  let Uses = ExtraUses, Defs = [RF, RA], Constraints = "$dst = $src1" in {
     let isCommutable = IsComm in
-    def _r : I8<(outs AReg:$dst), (ins AReg:$a, GPR8:$src),
-      !strconcat(Name, "\tA, $src"),
-      [(set AReg:$dst, (MatchOp AReg:$a, GPR8:$src))]>;
-    def _n : I16<(outs AReg:$dst), (ins AReg:$a, imm8:$imm),
-      !strconcat(Name, "\tA, $imm"),
-      [(set AReg:$dst, (MatchOp AReg:$a, imm8:$imm))]>;
+    def 8r : Pseudo<(outs R8:$dst), (ins R8:$src1, R8:$src2),
+      !strconcat(Name, "8r\t$dst, $src2"),
+      [(set R8:$dst, (MatchOp R8:$src1, R8:$src2))]>;
+    def 8i : Pseudo<(outs R8:$dst), (ins R8:$src1, imm8:$imm),
+      !strconcat(Name, "8i\t$dst, $imm"),
+      [(set R8:$dst, (MatchOp R8:$src1, imm8:$imm))]>;
+  }
+  let Uses = ExtraUses, Defs = [RF], Constraints = "$dst = $src1" in {
+    // Restricted to:
+    //   OP A, r
+    def _r : I8<(outs R8:$dst), (ins R8:$src1, R8:$src2),
+      !strconcat(Name, "\t$dst, $src2"),
+      []>;
+    // Restricted to:
+    //   OP A, n
+    def _n : I8<(outs R8:$dst), (ins R8:$src1, imm8:$imm),
+      !strconcat(Name, "\t$dst, $imm"),
+      []>;
     let mayLoad = 1 in
-    def _HL : I8<(outs AReg:$dst), (ins AReg:$a, HLPairs:$ptr),
-      !strconcat(Name, "\tA, [HL]"),
+    def _HL : I8<(outs R8:$dst), (ins R8:$src1, R16_HL:$ptr),
+      !strconcat(Name, "\t$dst, [$ptr]"),
       []>;
   }
 
-  let Uses = ExtraUses, Defs = [rF, rA], Constraints = "$dst = $src1" in {
+  // 16-bit pseudos.
+  let Uses = ExtraUses, Defs = [RF, RA], Constraints = "$dst = $src1" in {
     let isCommutable = IsComm in
-    def 16r : Pseudo<(outs Pairs:$dst), (ins Pairs:$src1, Pairs:$src2),
+    def 16r : Pseudo<(outs R16:$dst), (ins R16:$src1, R16:$src2),
       !strconcat(Name, "16r\t$dst, $src2"),
-      [(set Pairs:$dst, (MatchOp Pairs:$src1, Pairs:$src2))]>;
+      [(set R16:$dst, (MatchOp R16:$src1, R16:$src2))]>;
 
-    def 16i : Pseudo<(outs Pairs:$dst), (ins Pairs:$src1, imm16:$imm),
+    def 16i : Pseudo<(outs R16:$dst), (ins R16:$src1, imm16:$imm),
       !strconcat(Name, "16i\t$dst, $imm"),
-      [(set Pairs:$dst, (MatchOp Pairs:$src1, imm16:$imm))]>;
+      [(set R16:$dst, (MatchOp R16:$src1, imm16:$imm))]>;
   }
 }
 
 defm ADD : ALUOp<"ADD", add,  [],   1>;
-defm ADC : ALUOp<"ADC", adde, [rF], 1>;
+defm ADC : ALUOp<"ADC", adde, [RF], 1>;
 defm SUB : ALUOp<"SUB", sub>;
-defm SBC : ALUOp<"SBC", sube, [rF]>;
+defm SBC : ALUOp<"SBC", sube, [RF]>;
 defm AND : ALUOp<"AND", and,  [],   1>;
 defm OR  : ALUOp<"OR",  or,   [],   1>;
 defm XOR : ALUOp<"XOR", xor,  [],   1>;
 
 // TODO: Make pseudos for cp when the format is decided.
-let Defs = [rF] in {
-  def CP_r : I8<(outs), (ins AReg:$a, GPR8:$rhs),
-   "CP\tA, $rhs",
-    [(GBZ80cmp i8:$a, i8:$rhs)]>;
-  def CP_n : I16<(outs), (ins AReg:$a, imm8:$imm),
-    "CP\tA, $imm",
-    [(GBZ80cmp i8:$a, imm8:$imm)]>;
+
+let Defs = [RF, RA] in {
+  def CP8r : Pseudo<(outs), (ins R8:$lhs, R8:$rhs),
+    "CP8\t$lhs, $rhs",
+    [(GBZ80cmp i8:$lhs, i8:$rhs)]>;
+  def CP8i : Pseudo<(outs), (ins R8:$lhs, imm8:$imm),
+    "CP8\t$lhs, $imm",
+    [(GBZ80cmp i8:$lhs, imm8:$imm)]>;
+}
+
+let Defs = [RF] in {
+  // Restricted to:
+  //   CP A, r
+  def CP_r : I8<(outs), (ins R8:$lhs, R8:$rhs),
+    "CP\t$lhs, $rhs",
+    []>;
+  // Restricted to:
+  //   CP A, n
+  def CP_n : I16<(outs), (ins R8:$lhs, imm8:$imm),
+    "CP\t$lhs, $imm",
+    []>;
+
   let mayLoad = 1 in
-  def CP_HL : I8<(outs), (ins AReg:$a, HLPairs:$ptr),
-    "CP\tA, [HL]",
+  def CP_HL : I8<(outs), (ins R8:$lhs, R16_HL:$ptr),
+    "CP\t$lhs, [$ptr]",
     []>;
 }
 
 /*
 // Skip this for now
 let Defs = []
-def MUL8 : Pseudo<(outs GPR8:$dst), (ins GPR8:$src1, GPR8:$src2),
+def MUL8 : Pseudo<(outs R8:$dst), (ins R8:$src1, R8:$src2),
   "MUL8\t$dst, $src",
   []>;
 */
@@ -515,18 +556,18 @@ def MUL8 : Pseudo<(outs GPR8:$dst), (ins GPR8:$src1, GPR8:$src2),
 ///===============================
 foreach Name = ["INC", "DEC"] in {
   // 8-bit
-  let Defs = [rF], Constraints = "$dst = $src" in
-  def Name##_r : I8<(outs GPR8:$dst), (ins GPR8:$src),
+  let Defs = [RF], Constraints = "$dst = $src" in
+  def Name##_r : I8<(outs R8:$dst), (ins R8:$src),
     !strconcat(Name, "\t$src"),
     []>;
-  let Uses = [rHL], Defs = [rF, rA], mayLoad = 1 in
-  def Name##_HL : I8<(outs), (ins),
-    !strconcat(Name, "\t[HL]"),
+  let Defs = [RF], mayLoad = 1, mayStore = 1 in
+  def Name##_HL : I8<(outs), (ins R16_HL:$ptr),
+    !strconcat(Name, "\t[$ptr]"),
     []>;
 
   // 16-bit
   let Constraints = "$dst = $src" in
-  def Name##_ss : I8<(outs Pairs:$dst), (ins Pairs:$src),
+  def Name##_ss : I8<(outs R16_DD:$dst), (ins R16_DD:$src),
     !strconcat(Name, "\t$src"),
     []>;
 }
@@ -538,19 +579,19 @@ foreach Name = ["INC", "DEC"] in {
 // This can be thought of as a specialization of the pseudo
 // ADD16r when dst is HL.
 // Use for MUL too
-let Defs = [rF], Constraints = "$dst = $hl" in
-def ADD_HL_ss : I8<(outs HLPairs:$dst), (ins HLPairs:$hl, DDPairs:$src),
-  "ADD\tHL, $src",
+let Defs = [RF], Constraints = "$dst = $hl" in
+def ADD_HL_ss : I8<(outs R16_HL:$dst), (ins R16_HL:$hl, R16_DD:$src),
+  "ADD\t$dst, $src",
   []>;
 
-let Uses = [SP], Defs = [SP, rF] in
+let Uses = [SP], Defs = [SP, RF] in
 def ADD_SP_e : I16<(outs), (ins simm8:$imm),
   "ADD\tSP, $imm",
   []>;
 
 // Should this format the +/-?
-let Uses = [SP], Defs = [rF] in
-def LDHL_SP_e : I16<(outs HLPairs:$dst), (ins simm8:$imm),
+let Uses = [SP], Defs = [RF] in
+def LDHL_SP_e : I16<(outs R16_HL:$dst), (ins simm8:$imm),
   "LD\tHL, SP+$imm",
   []>;
 
@@ -573,8 +614,8 @@ def LDHL_SP_e : I16<(outs HLPairs:$dst), (ins simm8:$imm),
 // clobber A, since we might need to add an extra offset to the
 // pointer
 // XXX: Let's skip pointer correction for now.
-let Uses = [SP], Defs = [rF], mayStore = 1, mayLoad = 1 in
-def FRMIDX : Pseudo<(outs Pairs:$dst), (ins i16imm:$idx, i16imm:$offs),
+let Uses = [SP], Defs = [RF], mayStore = 1, mayLoad = 1 in
+def FRMIDX : Pseudo<(outs R16:$dst), (ins i16imm:$idx, i16imm:$offs),
   "FRMIDX\t$dst, $idx, $offs",
   []>;
 
@@ -590,12 +631,12 @@ def FRMIDX : Pseudo<(outs Pairs:$dst), (ins i16imm:$idx, i16imm:$offs),
 // LD A, [HL] (do we know if H or L are dst? if they aren't, emit directly)
 // POP HL
 // LD $dst, A (if H or L are dst)
-let Uses = [SP], Defs = [rF, rA], mayStore = 1, mayLoad = 1 in
-def FRMIDX_Load8 : Pseudo<(outs GPR8:$dst), (ins i16imm:$idx, i16imm:$offs),
+let Uses = [SP], Defs = [RF, RA], mayStore = 1, mayLoad = 1 in
+def FRMIDX_Load8 : Pseudo<(outs R8:$dst), (ins i16imm:$idx, i16imm:$offs),
   "FRMIDX_L8\t$dst, $idx, $offs",
   []>;
-let Uses = [SP], Defs = [rF, rA], mayStore = 1, mayLoad = 1 in
-def FRMIDX_Store8 : Pseudo<(outs), (ins i16imm:$idx, i16imm:$offs, GPR8:$src),
+let Uses = [SP], Defs = [RF, RA], mayStore = 1, mayLoad = 1 in
+def FRMIDX_Store8 : Pseudo<(outs), (ins i16imm:$idx, i16imm:$offs, R8:$src),
   "FRMIDX_S8\t$src, $idx, $offs",
   []>;
 
@@ -608,96 +649,98 @@ def FRMIDX_Store8 : Pseudo<(outs), (ins i16imm:$idx, i16imm:$offs, GPR8:$src),
 ///===============================
 
 let Constraints = "$dst = $src" in {
-  let Defs = [rF] in
-  def RLCA : I8<(outs AReg:$dst), (ins AReg:$src),
+  // Restricted to:
+  //   OP A
+  let Defs = [RF] in
+  def RLCA : I8<(outs R8:$dst), (ins R8:$src),
     "RLCA",
     []>;
-  let Defs = [rF], Uses = [rF] in
-  def RLA : I8<(outs AReg:$dst), (ins AReg:$src),
+  let Defs = [RF], Uses = [RF] in
+  def RLA : I8<(outs R8:$dst), (ins R8:$src),
     "RLA",
     []>;
-  let Defs = [rF] in
-  def RRCA : I8<(outs AReg:$dst), (ins AReg:$src),
+  let Defs = [RF] in
+  def RRCA : I8<(outs R8:$dst), (ins R8:$src),
     "RRCA",
     []>;
-  let Defs = [rF], Uses = [rF] in
-  def RRA : I8<(outs AReg:$dst), (ins AReg:$src),
+  let Defs = [RF], Uses = [RF] in
+  def RRA : I8<(outs R8:$dst), (ins R8:$src),
     "RRA",
     []>;
 
-  let Defs = [rF] in
-  def RLC_r : I16<(outs GPR8:$dst), (ins GPR8:$src),
+  let Defs = [RF] in
+  def RLC_r : I16<(outs R8:$dst), (ins R8:$src),
     "RLC\t$dst",
-    [(set GPR8:$dst, (GBZ80rol GPR8:$src))]>;
+    [(set R8:$dst, (GBZ80rol R8:$src))]>;
 
-  let Uses = [rF], Defs = [rF] in
-  def RL_r : I16<(outs GPR8:$dst), (ins GPR8:$src),
+  let Uses = [RF], Defs = [RF] in
+  def RL_r : I16<(outs R8:$dst), (ins R8:$src),
     "RL\t$dst",
     []>;
 
-  let Defs = [rF] in
-  def RRC_r : I16<(outs GPR8:$dst), (ins GPR8:$src),
+  let Defs = [RF] in
+  def RRC_r : I16<(outs R8:$dst), (ins R8:$src),
     "RRC\t$dst",
-    [(set GPR8:$dst, (GBZ80ror GPR8:$src))]>;
+    [(set R8:$dst, (GBZ80ror R8:$src))]>;
 
-  let Uses = [rF], Defs = [rF] in
-  def RR_r : I16<(outs GPR8:$dst), (ins GPR8:$src),
+  let Uses = [RF], Defs = [RF] in
+  def RR_r : I16<(outs R8:$dst), (ins R8:$src),
     "RR\t$dst",
     []>;
 
-  let Defs = [rF] in 
-  def SLA_r : I16<(outs GPR8:$dst), (ins GPR8:$src),
+  let Defs = [RF] in
+  def SLA_r : I16<(outs R8:$dst), (ins R8:$src),
     "SLA\t$dst",
-    [(set GPR8:$dst, (GBZ80lsl GPR8:$src))]>;
+    [(set R8:$dst, (GBZ80lsl R8:$src))]>;
 
-  let Defs = [rF] in 
-  def SRA_r : I16<(outs GPR8:$dst), (ins GPR8:$src),
+  let Defs = [RF] in
+  def SRA_r : I16<(outs R8:$dst), (ins R8:$src),
     "SRA\t$dst",
-    [(set GPR8:$dst, (GBZ80asr GPR8:$src))]>;
+    [(set R8:$dst, (GBZ80asr R8:$src))]>;
 
-  let Defs = [rF] in 
-  def SRL_r : I16<(outs GPR8:$dst), (ins GPR8:$src),
+  let Defs = [RF] in
+  def SRL_r : I16<(outs R8:$dst), (ins R8:$src),
     "SRL\t$dst",
-    [(set GPR8:$dst, (GBZ80lsr GPR8:$src))]>;
+    [(set R8:$dst, (GBZ80lsr R8:$src))]>;
 
-  let Defs = [rF] in 
-  def SWAP_r : I16<(outs GPR8:$dst), (ins GPR8:$src),
+  let Defs = [RF] in
+  def SWAP_r : I16<(outs R8:$dst), (ins R8:$src),
     "SWAP\t$dst",
-    [(set GPR8:$dst, (bswap GPR8:$src))]>;
+    [(set R8:$dst, (bswap R8:$src))]>;
 }
 
-let Defs = [rF], mayLoad = 1, mayStore = 1 in {
-  def RLC_HL : I16<(outs), (ins HLPairs:$ptr),
+let Defs = [RF], mayLoad = 1, mayStore = 1 in {
+  def RLC_HL : I16<(outs), (ins R16_HL:$ptr),
     "RLC\t[HL]",
     []>;
 
-  let Uses = [rF] in
-  def RL_HL : I16<(outs), (ins HLPairs:$ptr),
+  let Uses = [RF] in
+  def RL_HL : I16<(outs), (ins R16_HL:$ptr),
     "RL\t[HL]",
     []>;
 
-  def RRC_HL : I16<(outs), (ins HLPairs:$ptr),
+  def RRC_HL : I16<(outs), (ins R16_HL:$ptr),
     "RRC\t[HL]",
     []>;
 
-  let Uses = [rF] in
-  def RR_HL : I16<(outs), (ins HLPairs:$ptr),
+  let Uses = [RF] in
+  def RR_HL : I16<(outs), (ins R16_HL:$ptr),
     "RR\t[HL]",
     []>;
 
-  def SLA_HL : I16<(outs), (ins HLPairs:$ptr),
+  def SLA_HL : I16<(outs), (ins R16_HL:$ptr),
     "SLA\t[HL]",
     []>;
 
-  def SRA_HL : I16<(outs), (ins HLPairs:$ptr),
+  def SRA_HL : I16<(outs), (ins R16_HL:$ptr),
     "SRA\t[HL]",
     []>;
 
-  def SRL_HL : I16<(outs), (ins HLPairs:$ptr),
+  def SRL_HL : I16<(outs), (ins R16_HL:$ptr),
     "SRL\t[HL]",
     []>;
   
-  def SWAP_HL : I16<(outs), (ins HLPairs:$ptr),
+  def SWAP_HL : I16<(outs), (ins R16_HL:$ptr),
     "SWAP\t[HL]",
     []>;
 }
@@ -707,71 +750,71 @@ let Defs = [rF], mayLoad = 1, mayStore = 1 in {
 ///===============================
 
 def IselLsl8 : ShiftPseudo<
-  (outs GPR8:$dst),
-  (ins GPR8:$src, GPR8:$cnt),
+  (outs R8:$dst),
+  (ins R8:$src, R8:$cnt),
   "# Lsl8 PSEUDO",
   [(set i8:$dst, (GBZ80lslLoop i8:$src, i8:$cnt))]
 >;
 
 def IselLsl16 : ShiftPseudo<
-  (outs Pairs:$dst),
-  (ins Pairs:$src, GPR8:$cnt),
+  (outs R16:$dst),
+  (ins R16:$src, R8:$cnt),
   "# Lsl16 PSEUDO",
   [(set i16:$dst, (GBZ80lslLoop i16:$src, i8:$cnt))]
 >;
 
 def IselLsr8 : ShiftPseudo<
-  (outs GPR8:$dst),
-  (ins GPR8:$src, GPR8:$cnt),
+  (outs R8:$dst),
+  (ins R8:$src, R8:$cnt),
   "# Lsr8 PSEUDO",
   [(set i8:$dst, (GBZ80lsrLoop i8:$src, i8:$cnt))]
 >;
 
 def IselLsr16 : ShiftPseudo<
-  (outs Pairs:$dst),
-   (ins Pairs:$src, GPR8:$cnt),
+  (outs R16:$dst),
+   (ins R16:$src, R8:$cnt),
    "# Lsr16 PSEUDO",
    [(set i16:$dst, (GBZ80lsrLoop i16:$src, i8:$cnt))]
 >;
 
 def IselRol8 : ShiftPseudo<
-  (outs GPR8:$dst),
-  (ins GPR8:$src, GPR8:$cnt),
+  (outs R8:$dst),
+  (ins R8:$src, R8:$cnt),
   "# Rol8 PSEUDO",
   [(set i8:$dst, (GBZ80rolLoop i8:$src, i8:$cnt))]
 >;
 
 def IselRol16 : ShiftPseudo<
-  (outs Pairs:$dst),
-  (ins Pairs:$src, GPR8:$cnt),
+  (outs R16:$dst),
+  (ins R16:$src, R8:$cnt),
   "# Rol16 PSEUDO",
   [(set i16:$dst, (GBZ80rolLoop i16:$src, i8:$cnt))]
 >;
 
 def IselRor8 : ShiftPseudo<
-  (outs GPR8:$dst),
-  (ins GPR8:$src, GPR8:$cnt),
+  (outs R8:$dst),
+  (ins R8:$src, R8:$cnt),
   "# Ror8 PSEUDO",
   [(set i8:$dst, (GBZ80rorLoop i8:$src, i8:$cnt))]
 >;
 
 def IselRor16 : ShiftPseudo<
-  (outs Pairs:$dst),
-  (ins Pairs:$src, GPR8:$cnt),
+  (outs R16:$dst),
+  (ins R16:$src, R8:$cnt),
   "# Ror16 PSEUDO",
   [(set i16:$dst, (GBZ80rorLoop i16:$src, i8:$cnt))]
 >;
 
 def IselAsr8 : ShiftPseudo<
-  (outs GPR8:$dst),
-  (ins GPR8:$src, GPR8:$cnt),
+  (outs R8:$dst),
+  (ins R8:$src, R8:$cnt),
   "# Asr8 PSEUDO",
   [(set i8:$dst, (GBZ80asrLoop i8:$src, i8:$cnt))]
 >;
 
 def IselAsr16 : ShiftPseudo<
-  (outs Pairs:$dst),
-   (ins Pairs:$src, GPR8:$cnt),
+  (outs R16:$dst),
+   (ins R16:$src, R8:$cnt),
    "# Asr16 PSEUDO",
    [(set i16:$dst, (GBZ80asrLoop i16:$src, i8:$cnt))]
 >;
@@ -785,29 +828,29 @@ let Constraints = "$dst = $src" in {
 
   //  SLA B
   //  RL A
-  def SHL16 : Pseudo<(outs Pairs:$dst), (ins Pairs:$src),
+  def SHL16 : Pseudo<(outs R16:$dst), (ins R16:$src),
     "SHL16\t$dst",
     []>;
 
   //  SRL A
   //  RR B
-  def LSR16 : Pseudo<(outs Pairs:$dst), (ins Pairs:$src),
+  def LSR16 : Pseudo<(outs R16:$dst), (ins R16:$src),
     "LSR16\t$dst",
     []>;
 
   // ??
-  def ROL16 : Pseudo<(outs Pairs:$dst), (ins Pairs:$src),
+  def ROL16 : Pseudo<(outs R16:$dst), (ins R16:$src),
     "ROL16\t$dst",
     []>;
 
   // ??
-  def ROR16 : Pseudo<(outs Pairs:$dst), (ins Pairs:$src),
+  def ROR16 : Pseudo<(outs R16:$dst), (ins R16:$src),
     "ROR16\t$dst",
     []>;
 
   //  SRA A
   //  RL B
-  def ASR16 : Pseudo<(outs Pairs:$dst), (ins Pairs:$src),
+  def ASR16 : Pseudo<(outs R16:$dst), (ins R16:$src),
     "ASR16\t$dst",
     []>;
 
@@ -817,27 +860,27 @@ let Constraints = "$dst = $src" in {
 /// Bit operations
 ///===============================
 
-let Defs = [rF] in
-def BIT_r : I16<(outs), (ins GPR8:$src, uimm3:$imm),
+let Defs = [RF] in
+def BIT_r : I16<(outs), (ins R8:$src, uimm3:$imm),
   "BIT\t$imm, $src",
   []>;
 
 let Constraints = "$dst = $src" in {
-  def SET_r : I16<(outs GPR8:$dst), (ins GPR8:$src, uimm8p2:$imm),
+  def SET_r : I16<(outs R8:$dst), (ins R8:$src, uimm8p2:$imm),
     "SET\t$imm, $dst",
     []>;
 
-  def RES_r : I16<(outs GPR8:$dst), (ins GPR8:$src, uimm8p2:$imm),
+  def RES_r : I16<(outs R8:$dst), (ins R8:$src, uimm8p2:$imm),
     "RES\t$imm, $dst",
     []>;
 }
 
 let mayLoad = 1, mayStore = 1 in {
-  def SET_HL : I16<(outs), (ins imm8:$imm, HLPairs:$ptr),
+  def SET_HL : I16<(outs), (ins imm8:$imm, R16_HL:$ptr),
     "SET\t$imm, [HL]",
     []>;
 
-  def RES_HL : I16<(outs), (ins imm8:$imm, HLPairs:$ptr),
+  def RES_HL : I16<(outs), (ins imm8:$imm, R16_HL:$ptr),
     "RES\t$imm, [HL]",
     []>;
 }
@@ -846,12 +889,12 @@ let mayLoad = 1, mayStore = 1 in {
 /// Extension
 ///===============================
 
-let Defs = [rF] in {
-  def SEXT : ExtensionPseudo<(outs Pairs:$dst), (ins GPR8:$src),
+let Defs = [RF] in {
+  def SEXT : ExtensionPseudo<(outs R16:$dst), (ins R8:$src),
     "SEXT\t$dst, $src",
     [(set i16:$dst, (sext i8:$src))]>;
 
-  def ZEXT : ExtensionPseudo<(outs Pairs:$dst), (ins GPR8:$src),
+  def ZEXT : ExtensionPseudo<(outs R16:$dst), (ins R8:$src),
     "ZEXT\t$dst, $src",
     [(set i16:$dst, (zext i8:$src))]>;
 }
@@ -888,61 +931,61 @@ let isBranch = 1, isTerminator = 1 in {
     // indirectbr? Should this have a real input instead of an impdef?
     // nah
     let isIndirectBranch = 1 in
-    def JP_HL : I8<(outs), (ins HLPairs:$ptr),
+    def JP_HL : I8<(outs), (ins R16_HL:$ptr),
       "JP\tHL",
       []>;
   }
 
   // TODO: print routines for the codes? how do we print?
-  let Uses = [rF] in
+  let Uses = [RF] in
   def JP_cc_nn : I24<(outs), (ins brtarget16:$targ, condcode:$cc),
     "JP\t$cc, $targ",
     []>;
   
-  let Uses = [rF] in
+  let Uses = [RF] in
   def JR_cc_e : I16<(outs), (ins relbrtarget8:$targ, condcode:$cc),
     "JR\t$cc, $targ",
     [(GBZ80brcond bb:$targ, condcode:$cc)]>;
 
   // Pseudo compare+jump for i16. Expand after isel.
-  def BR16 : Pseudo<(outs), (ins brtarget16:$targ, condcode:$cc, Pairs:$lhs, Pairs:$rhs),
+  def BR16 : Pseudo<(outs), (ins brtarget16:$targ, condcode:$cc, R16:$lhs, R16:$rhs),
     "BR16\t$targ, $lhs, $rhs",
-    [(GBZ80br16 bb:$targ, condcode:$cc, Pairs:$lhs, Pairs:$rhs)]>;
+    [(GBZ80br16 bb:$targ, condcode:$cc, R16:$lhs, R16:$rhs)]>;
 }
 
 ///===============================
 /// Select pseudos
 ///===============================
 
-let Defs = [rF] in {
+let Defs = [RF] in {
   // Select an i8 from an i8 comparison.
   def Select8_8 : Pseudo<
-    (outs GPR8:$dst),
-    (ins GPR8:$src, GPR8:$src2, i8imm:$cc),
+    (outs R8:$dst),
+    (ins R8:$src, R8:$src2, i8imm:$cc),
     "# Select8_8 PSEUDO",
     [(set i8:$dst, (GBZ80selectcc i8:$src, i8:$src2, imm:$cc))]
   >;
   // Select an i16 from an i8 comparison.
   def Select16_8 : Pseudo<
-    (outs Pairs:$dst),
-    (ins Pairs:$src, Pairs:$src2, i8imm:$cc),
+    (outs R16:$dst),
+    (ins R16:$src, R16:$src2, i8imm:$cc),
     "# Select16_8 PSEUDO",
     [(set i16:$dst, (GBZ80selectcc i16:$src, i16:$src2, imm:$cc))]
   >;
 }
 
-let Defs = [rF, rA] in {
+let Defs = [RF, RA] in {
   // Select an i16 from an i16 comparison.
   def Select16_16 : Pseudo<
-    (outs Pairs:$dst),
-    (ins Pairs:$src, Pairs:$src2, i8imm:$cc, Pairs:$lhs, Pairs:$rhs),
+    (outs R16:$dst),
+    (ins R16:$src, R16:$src2, i8imm:$cc, R16:$lhs, R16:$rhs),
     "# Select16_16 PSEUDO",
     [(set i16:$dst, (GBZ80selectbr i16:$src, i16:$src2, timm:$cc, i16:$lhs, i16:$rhs))]
   >;
   // Select an i8 from an i16 comparison.
   def Select8_16 : Pseudo<
-    (outs GPR8:$dst),
-    (ins GPR8:$src, GPR8:$src2, i8imm:$cc, Pairs:$lhs, Pairs:$rhs),
+    (outs R8:$dst),
+    (ins R8:$src, R8:$src2, i8imm:$cc, R16:$lhs, R16:$rhs),
     "# Select8_16 PSEUDO",
     [(set i8:$dst, (GBZ80selectbr i8:$src, i8:$src2, timm:$cc, i16:$lhs, i16:$rhs))]
   >;
@@ -953,17 +996,18 @@ let Defs = [rF, rA] in {
 ///===============================
 
 let isCall = 1 in {
-  let Uses = [SP, IME], Defs = [IME, rA, rF, rAF, rB, rC, rBC] in
+  // FIXME: These defs will have to go if calling convs change.
+  let Uses = [SP, IME], Defs = [IME, RA, RF, RAF, RB, RC, RBC] in
   def CALL_nn : I24<(outs), (ins calltarget:$targ),
     "CALL\t$targ",
     [(GBZ80call imm:$targ)]>;
   
-  let Uses = [SP, IME, rF], Defs = [IME, rA, rF, rAF, rH, rL, rHL] in
+  let Uses = [SP, IME, RF], Defs = [IME, RA, RF, RAF, RB, RC, RBC] in
   def CALL_cc_nn : I24<(outs), (ins calltarget:$targ, condcode:$cc),
     "CALL\t$cc, $targ",
     []>;
 
-  let Uses = [SP, IME], Defs = [IME, rA, rF, rAF, rH, rL, rHL] in 
+  let Uses = [SP, IME], Defs = [IME, RA, RF, RAF, RB, RC, RBC] in
   def RST_t : I8<(outs), (ins imm8:$t),
     "RST\t$t",
     []>;
@@ -983,7 +1027,7 @@ let isReturn = 1, isTerminator = 1 in {
       "RETI",
       []>;
   }
-  let Uses = [rF] in
+  let Uses = [RF] in
   def RET_cc : I8<(outs), (ins condcode:$cc),
     "RET\t$cc",
     []>;
@@ -993,27 +1037,36 @@ let isReturn = 1, isTerminator = 1 in {
 /// Other instructions
 ///===============================
 
-let Defs = [rF], Uses = [rF], Constraints = "$dst = $src" in
-def DAA : I8<(outs AReg:$dst), (ins AReg:$src),
+// TODO: Many of these probably need pseudos.
+
+let Defs = [RF], Uses = [RF], Constraints = "$dst = $src" in
+def DAA : I8<(outs R8:$dst), (ins R8:$src),
   "DAA",
   []>;
 
-let Defs = [rF], Constraints = "$dst = $src" in
-def CPL : I8<(outs AReg:$dst), (ins AReg:$src),
-  "CPL",
+let Defs = [RF, RA], Constraints = "$dst = $src" in
+def CPL8 : Pseudo<(outs R8:$dst), (ins R8:$src),
+  "CPL\t$dst",
   [(set i8:$dst, (not i8:$src))]>;
+
+// Restricted to:
+//   CPL A
+let Defs = [RF], Constraints = "$dst = $src" in
+def CPL_r : I8<(outs R8:$dst), (ins R8:$src),
+  "CPL\t$dst",
+  []>;
 
 // It does nothing
 def NOP : I8<(outs), (ins),
   "NOP",
   []>;
 
-let Defs = [rF], Uses = [rF] in
+let Defs = [RF], Uses = [RF] in
 def CCF : I8<(outs), (ins),
   "CCF",
   []>;
 
-let Defs = [rF] in
+let Defs = [RF] in
 def SCF : I8<(outs), (ins),
   "SCF",
   []>;
@@ -1055,46 +1108,47 @@ def : Pat<(GBZ80call (i16 texternalsym:$dst)),
 
 // Store to global.
 def : Pat<(store i8:$src, (GBZ80Wrapper tglobaladdr:$addr)),
-          (LD_nn_A $src, $addr)>;
+          (ST8 $src, $addr)>;
 def : Pat<(store i8:$src, (GBZ80Wrapper texternalsym:$addr)),
-          (LD_nn_A $src, $addr)>;
+          (ST8 $src, $addr)>;
 
 // Load from global.
 def : Pat<(i8 (load (GBZ80Wrapper tglobaladdr:$addr))),
-          (LD_A_nn $addr)>;
+          (LD8 $addr)>;
 def : Pat<(i8 (load (GBZ80Wrapper texternalsym:$addr))),
-          (LD_A_nn $addr)>;
+          (LD8 $addr)>;
 
 // Inc/dec of i8 and i16.
-def : Pat<(add GPR8:$src, 1),  (INC_r $src)>;
-def : Pat<(add GPR8:$src, -1), (DEC_r $src)>;
-def : Pat<(sub GPR8:$src, 1),  (DEC_r $src)>;
+def : Pat<(add R8:$src, 1),  (INC_r $src)>;
+def : Pat<(add R8:$src, -1), (DEC_r $src)>;
+def : Pat<(sub R8:$src, 1),  (DEC_r $src)>;
 
-def : Pat<(add Pairs:$src, 1),  (INC_ss $src)>;
-def : Pat<(add Pairs:$src, -1), (DEC_ss $src)>;
-def : Pat<(sub Pairs:$src, 1),  (DEC_ss $src)>;
+def : Pat<(add R16:$src, 1),  (INC_ss $src)>;
+def : Pat<(add R16:$src, -1), (DEC_ss $src)>;
+def : Pat<(sub R16:$src, 1),  (DEC_ss $src)>;
 
 // Simplification for negation.
-def : Pat<(ineg GPR8:$src),
+// TODO: Use some kind of generic CPL pattern?
+def : Pat<(ineg R8:$src),
   (INC_r (XOR_n $src, 0xFF))>;
-def : Pat<(ineg Pairs:$src),
+def : Pat<(ineg R16:$src),
   (INC_ss (XOR16i $src, 0xFFFF))>;
 
 // Patterns for RES and SET on i8.
 let AddedComplexity = 10 in {
 // Match an OR with a power of 2. XFORM the immediate to a log2.
-def : Pat<(or GPR8:$src, uimm8p2:$imm),
+def : Pat<(or R8:$src, uimm8p2:$imm),
   (SET_r $src, (uimm8p2_XFORM imm:$imm))>;
 // Match an AND with an inverse of a power of two. XFORM the immediate.
-def : Pat<(and GPR8:$src, uimm8p2n:$imm),
+def : Pat<(and R8:$src, uimm8p2n:$imm),
   (RES_r $src, (uimm8p2n_XFORM imm:$imm))>;
 }
 
 let AddedComplexity = 10 in {
-def : Pat<(or Pairs:$src, uimm16hip2:$imm),
+def : Pat<(or R16:$src, uimm16hip2:$imm),
   (buildPair (SET_r (toHi $src), (uimm16hip2_XFORM imm:$imm)),
              (toLo $src))>;
-def : Pat<(or Pairs:$src, uimm16lop2:$imm),
+def : Pat<(or R16:$src, uimm16lop2:$imm),
   (buildPair (toHi $src),
              (SET_r (toLo $src), (uimm16lop2_XFORM imm:$imm)))>;
 }

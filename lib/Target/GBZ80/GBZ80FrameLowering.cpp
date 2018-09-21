@@ -83,7 +83,7 @@ void GBZ80FrameLowering::emitPrologue(MachineFunction &MF,
                          .addImm(-FrameSize)
                          .setMIFlag(MachineInstr::FrameSetup);
   // The flag operand is dead.
-  MI->findRegisterDefOperand(GB::rF)->setIsDead();
+  MI->findRegisterDefOperand(GB::RF)->setIsDead();
 }
 
 void GBZ80FrameLowering::emitEpilogue(MachineFunction &MF,
@@ -124,7 +124,7 @@ void GBZ80FrameLowering::emitEpilogue(MachineFunction &MF,
   MachineInstr *MI = BuildMI(MBB, MBBI, DL, TII.get(GB::ADD_SP_e))
                          .addImm(FrameSize);
   // The flag operand is dead.
-  MI->findRegisterDefOperand(GB::rF)->setIsDead();
+  MI->findRegisterDefOperand(GB::RF)->setIsDead();
 }
 
 // Our frame pointer is the stack pointer, so we do not have a frame pointer.

@@ -48,7 +48,7 @@ void GBZ80InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   const GBZ80RegisterInfo &TRI = *STI.getRegisterInfo();
   unsigned Opc;
 
-  if (GB::PairsRegClass.contains(DestReg, SrcReg)) {
+  if (GB::R16RegClass.contains(DestReg, SrcReg)) {
     // 16-to-16 copy. Use two reg-LDs.
     unsigned DestLo, DestHi, SrcLo, SrcHi;
 
@@ -60,11 +60,11 @@ void GBZ80InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     BuildMI(MBB, MI, DL, get(GB::LD_r_r), DestHi)
       .addReg(SrcHi, getKillRegState(KillSrc));
   }
-  else if (GB::GPR8RegClass.contains(DestReg, SrcReg)) {
+  else if (GB::R8RegClass.contains(DestReg, SrcReg)) {
     BuildMI(MBB, MI, DL, get(GB::LD_r_r), DestReg)
       .addReg(SrcReg, getKillRegState(KillSrc));
   }
-  else if (DestReg == GB::SP && SrcReg == GB::rHL) {
+  else if (DestReg == GB::SP && SrcReg == GB::RHL) {
     BuildMI(MBB, MI, DL, get(GB::LD_SP_HL), DestReg)
       .addReg(SrcReg, getKillRegState(KillSrc));
   }
@@ -306,6 +306,9 @@ bool safeToCommute(MachineInstr &MI, unsigned OpIdx1, unsigned OpIdx2) {
   unsigned LHSSub = MI.getOperand(OpIdx1).getSubReg();
   unsigned RHSSub = MI.getOperand(OpIdx2).getSubReg();
 
+  // Temporarily.
+  return false;
+#if 0
   // Looking for defines of LHSReg and RHSReg. Search upwards.
   MachineBasicBlock::reverse_iterator Begin = MI, End = MBB.rend();
   ++Begin;
@@ -326,8 +329,8 @@ bool safeToCommute(MachineInstr &MI, unsigned OpIdx1, unsigned OpIdx2) {
     return false;
 
   bool LHSIsSafe = !TRI->isPhysicalRegister(LHSDef->getOperand(1).getReg()) &&
-    (MRI.getRegClass(LHSDef->getOperand(1).getReg()) == &GB::GPR8RegClass ||
-     MRI.getRegClass(LHSDef->getOperand(1).getReg())->hasSuperClassEq(&GB::PairsRegClass));
+    (MRI.getRegClass(LHSDef->getOperand(1).getReg()) == &GB::R8RegClass ||
+     MRI.getRegClass(LHSDef->getOperand(1).getReg())->hasSuperClassEq(&GB::R16RegClass));
 
   bool RHSIsSafe =
     (TRI->isPhysicalRegister(RHSDef->getOperand(1).getReg()) &&
@@ -336,6 +339,7 @@ bool safeToCommute(MachineInstr &MI, unsigned OpIdx1, unsigned OpIdx2) {
      MRI.getRegClass(RHSDef->getOperand(1).getReg()) == &GB::ARegRegClass);
 
   return LHSIsSafe && RHSIsSafe;
+  #endif
 }
 
 MachineInstr *
@@ -345,7 +349,7 @@ GBZ80InstrInfo::commuteInstructionImpl(MachineInstr &MI, bool NewMI,
 
   // Commuting an arithmetic instruction where the LHS is a copy from GPR
   // and the RHS is a copy from A is beneficial.
-  if (MRI.getRegClass(MI.getOperand(OpIdx2).getReg()) == &GB::GPR8RegClass) {
+  if (MRI.getRegClass(MI.getOperand(OpIdx2).getReg())->hasSuperClassEq(&GB::R8RegClass)) {
     if (!safeToCommute(MI, OpIdx1, OpIdx2))
       return nullptr;
   }
