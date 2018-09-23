@@ -84,11 +84,3 @@ class SelectPseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
   let Defs = [RF];
 }
 
-class ShiftPseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
-  : Pseudo<outs, ins, asmstr, pattern>
-{
-  let usesCustomInserter = 1;
-
-  let Defs = [RF];
-}
-

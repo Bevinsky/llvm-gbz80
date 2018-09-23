@@ -54,6 +54,7 @@ private:
   MachineInstr *expandSelect(MachineInstr &);
   MachineInstr *expandPseudo(MachineInstr &);
   bool expandPseudos();
+  bool expandShiftLoop16();
   bool expandBranch16();
   bool optimizeCP();
 
@@ -306,6 +307,146 @@ bool GBZ80PostISel::expandPseudos() {
   return Modified;
 }
 
+bool GBZ80PostISel::expandShiftLoop16() {
+  bool Modified = false;
+
+  for (auto MBBI = MF->begin(); MBBI != MF->end(); ++MBBI ) {
+    for (auto MII = MBBI->begin(); MII != MBBI->end(); ) {
+      MachineBasicBlock *MBB = &*MBBI;
+      MachineInstr &MI = *MII;
+      DebugLoc dl = MI.getDebugLoc();
+
+      unsigned Opc;
+      const TargetRegisterClass *RC;
+      switch (MI.getOpcode()) {
+      default:
+        ++MII;
+        continue;
+      case GB::IselLsl8:
+        Opc = GB::SLA_r;
+        RC = &GB::R8RegClass;
+        break;
+      case GB::IselLsl16:
+        Opc = GB::SHL16;
+        RC = &GB::R16RegClass;
+        break;
+      case GB::IselAsr8:
+        Opc = GB::SRA_r;
+        RC = &GB::R8RegClass;
+        break;
+      case GB::IselAsr16:
+        Opc = GB::ASR16;
+        RC = &GB::R16RegClass;
+        break;
+      case GB::IselLsr8:
+        Opc = GB::SRL_r;
+        RC = &GB::R8RegClass;
+        break;
+      case GB::IselLsr16:
+        Opc = GB::LSR16;
+        RC = &GB::R16RegClass;
+        break;
+      case GB::IselRol8:
+        Opc = GB::RLC_r;
+        RC = &GB::R8RegClass;
+        break;
+      case GB::IselRol16:
+        Opc = GB::ROL16;
+        RC = &GB::R16RegClass;
+        break;
+      case GB::IselRor8:
+        Opc = GB::RRC_r;
+        RC = &GB::R8RegClass;
+        break;
+      case GB::IselRor16:
+        Opc = GB::ROR16;
+        RC = &GB::R16RegClass;
+        break;
+      }
+
+      MachineFunction::iterator I;
+      for (I = MF->begin(); I != MF->end() && I != MBBI; ++I);
+      if (I != MF->end()) ++I;
+
+      // Create loop block.
+      MachineBasicBlock *LoopBB =
+        MF->CreateMachineBasicBlock(MBBI->getBasicBlock());
+      MachineBasicBlock *RemBB =
+        MF->CreateMachineBasicBlock(MBBI->getBasicBlock());
+
+      MF->insert(I, LoopBB);
+      MF->insert(I, RemBB);
+
+      // Update machine-CFG edges by transferring all successors of the current
+      // block to the block containing instructions after shift.
+      RemBB->splice(RemBB->begin(), &*MBBI, std::next(MachineBasicBlock::iterator(MI)),
+                    MBBI->end());
+      RemBB->transferSuccessorsAndUpdatePHIs(&*MBBI);
+
+      // Add adges BB => LoopBB => RemBB, BB => RemBB, LoopBB => LoopBB.
+      MBBI->addSuccessor(LoopBB);
+      MBBI->addSuccessor(RemBB);
+      LoopBB->addSuccessor(RemBB);
+      LoopBB->addSuccessor(LoopBB);
+
+      unsigned ShiftAmtReg = MRI->createVirtualRegister(&GB::R8RegClass);
+      unsigned ShiftAmtReg2 = MRI->createVirtualRegister(&GB::R8RegClass);
+      unsigned ShiftReg = MRI->createVirtualRegister(RC);
+      unsigned ShiftReg2 = MRI->createVirtualRegister(RC);
+      unsigned ShiftAmtSrcReg = MI.getOperand(2).getReg();
+      unsigned SrcReg = MI.getOperand(1).getReg();
+      unsigned DstReg = MI.getOperand(0).getReg();
+
+      // BB:
+      // cpi N, 0
+      // breq RemBB
+      BuildMI(&*MBBI, dl, TII->get(GB::CP8i))
+        .addReg(ShiftAmtSrcReg)
+        .addImm(0);
+      BuildMI(&*MBBI, dl, TII->get(GB::JR_cc_e))
+        .addMBB(RemBB)
+        .addImm(GBCC::COND_Z);
+
+      // LoopBB:
+      // ShiftReg = phi [%SrcReg, BB], [%ShiftReg2, LoopBB]
+      // ShiftAmt = phi [%N, BB],      [%ShiftAmt2, LoopBB]
+      // ShiftReg2 = shift ShiftReg
+      // ShiftAmt2 = ShiftAmt - 1;
+      BuildMI(LoopBB, dl, TII->get(GB::PHI), ShiftReg)
+          .addReg(SrcReg)
+          .addMBB(&*MBBI)
+          .addReg(ShiftReg2)
+          .addMBB(LoopBB);
+      BuildMI(LoopBB, dl, TII->get(GB::PHI), ShiftAmtReg)
+          .addReg(ShiftAmtSrcReg)
+          .addMBB(&*MBBI)
+          .addReg(ShiftAmtReg2)
+          .addMBB(LoopBB);
+      BuildMI(LoopBB, dl, TII->get(Opc), ShiftReg2)
+        .addReg(ShiftReg);
+      BuildMI(LoopBB, dl, TII->get(GB::DEC_r), ShiftAmtReg2)
+          .addReg(ShiftAmtReg);
+      BuildMI(LoopBB, dl, TII->get(GB::JR_cc_e))
+        .addMBB(LoopBB)
+        .addImm(GBCC::COND_NZ);
+
+      // RemBB:
+      // DestReg = phi [%SrcReg, BB], [%ShiftReg, LoopBB]
+      BuildMI(*RemBB, RemBB->begin(), dl, TII->get(GB::PHI), DstReg)
+          .addReg(SrcReg)
+          .addMBB(&*MBBI)
+          .addReg(ShiftReg2)
+          .addMBB(LoopBB);
+      MI.eraseFromParent(); // The pseudo instruction is gone now.
+      MII = MBBI->begin();
+      MF->getProperties().reset(MachineFunctionProperties::Property::NoPHIs);
+      Modified |= true;
+    }
+  }
+
+  return Modified;
+}
+
 
 bool GBZ80PostISel::optimizeCP() {
   bool Modified = false;
@@ -544,6 +685,9 @@ bool GBZ80PostISel::runOnMachineFunction(MachineFunction &MF) {
   TRI = STI.getRegisterInfo();
   TII = STI.getInstrInfo();
   MRI = &MF.getRegInfo();
+
+  // Expand shift loop pseudos.
+  Modified |= expandShiftLoop16();
 
   Modified |= expandPseudos();
 

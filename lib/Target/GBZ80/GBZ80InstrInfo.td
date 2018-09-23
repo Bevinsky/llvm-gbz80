@@ -749,70 +749,70 @@ let Defs = [RF], mayLoad = 1, mayStore = 1 in {
 /// ISel shift pseudos
 ///===============================
 
-def IselLsl8 : ShiftPseudo<
+def IselLsl8 : Pseudo<
   (outs R8:$dst),
   (ins R8:$src, R8:$cnt),
   "# Lsl8 PSEUDO",
   [(set i8:$dst, (GBZ80lslLoop i8:$src, i8:$cnt))]
 >;
 
-def IselLsl16 : ShiftPseudo<
+def IselLsl16 : Pseudo<
   (outs R16:$dst),
   (ins R16:$src, R8:$cnt),
   "# Lsl16 PSEUDO",
   [(set i16:$dst, (GBZ80lslLoop i16:$src, i8:$cnt))]
 >;
 
-def IselLsr8 : ShiftPseudo<
+def IselLsr8 : Pseudo<
   (outs R8:$dst),
   (ins R8:$src, R8:$cnt),
   "# Lsr8 PSEUDO",
   [(set i8:$dst, (GBZ80lsrLoop i8:$src, i8:$cnt))]
 >;
 
-def IselLsr16 : ShiftPseudo<
+def IselLsr16 : Pseudo<
   (outs R16:$dst),
    (ins R16:$src, R8:$cnt),
    "# Lsr16 PSEUDO",
    [(set i16:$dst, (GBZ80lsrLoop i16:$src, i8:$cnt))]
 >;
 
-def IselRol8 : ShiftPseudo<
+def IselRol8 : Pseudo<
   (outs R8:$dst),
   (ins R8:$src, R8:$cnt),
   "# Rol8 PSEUDO",
   [(set i8:$dst, (GBZ80rolLoop i8:$src, i8:$cnt))]
 >;
 
-def IselRol16 : ShiftPseudo<
+def IselRol16 : Pseudo<
   (outs R16:$dst),
   (ins R16:$src, R8:$cnt),
   "# Rol16 PSEUDO",
   [(set i16:$dst, (GBZ80rolLoop i16:$src, i8:$cnt))]
 >;
 
-def IselRor8 : ShiftPseudo<
+def IselRor8 : Pseudo<
   (outs R8:$dst),
   (ins R8:$src, R8:$cnt),
   "# Ror8 PSEUDO",
   [(set i8:$dst, (GBZ80rorLoop i8:$src, i8:$cnt))]
 >;
 
-def IselRor16 : ShiftPseudo<
+def IselRor16 : Pseudo<
   (outs R16:$dst),
   (ins R16:$src, R8:$cnt),
   "# Ror16 PSEUDO",
   [(set i16:$dst, (GBZ80rorLoop i16:$src, i8:$cnt))]
 >;
 
-def IselAsr8 : ShiftPseudo<
+def IselAsr8 : Pseudo<
   (outs R8:$dst),
   (ins R8:$src, R8:$cnt),
   "# Asr8 PSEUDO",
   [(set i8:$dst, (GBZ80asrLoop i8:$src, i8:$cnt))]
 >;
 
-def IselAsr16 : ShiftPseudo<
+def IselAsr16 : Pseudo<
   (outs R16:$dst),
    (ins R16:$src, R8:$cnt),
    "# Asr16 PSEUDO",
