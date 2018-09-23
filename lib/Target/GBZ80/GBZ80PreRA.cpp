@@ -117,7 +117,8 @@ bool GBZ80PreRA::widenConstrainedRegClasses() {
       if (SafeToReassignDef)
         MII->getOperand(0).setReg(NewReg);
       else {
-        MII = BuildMI(MBB, MII->getNextNode(), DebugLoc(), TII->get(GB::COPY), NewReg)
+        do { ++MII; } while (MII->isPHI());
+        MII = BuildMI(MBB, MII, DebugLoc(), TII->get(GB::COPY), NewReg)
           .addReg(DefReg);
       }
 
@@ -136,10 +137,12 @@ bool GBZ80PreRA::widenConstrainedRegClasses() {
       if (SafeToReassignDef) {
         // If we changed the real def to NewDef and there are still uses of
         // DefReg, make a copy here.
-        if (!MRI->use_empty(DefReg))
-          MII = BuildMI(MBB, MII->getNextNode(), DebugLoc(),
+        if (!MRI->use_empty(DefReg)) {
+          do { ++MII; } while (MII->isPHI());
+          MII = BuildMI(MBB, MII, DebugLoc(),
                         TII->get(GB::COPY), DefReg)
             .addReg(NewReg);
+        }
       } else {
         // If we made a copy to NewDef, but didn't actually use it, remove it.
         if (MRI->use_empty(NewReg)) {
