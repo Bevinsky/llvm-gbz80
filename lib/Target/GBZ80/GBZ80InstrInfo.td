@@ -830,13 +830,13 @@ let Constraints = "$dst = $src" in {
   //  RL A
   def SHL16 : Pseudo<(outs R16:$dst), (ins R16:$src),
     "SHL16\t$dst",
-    []>;
+    [(set i16:$dst, (GBZ80lsl i16:$src))]>;
 
   //  SRL A
   //  RR B
   def LSR16 : Pseudo<(outs R16:$dst), (ins R16:$src),
     "LSR16\t$dst",
-    []>;
+    [(set i16:$dst, (GBZ80lsr i16:$src))]>;
 
   // ??
   def ROL16 : Pseudo<(outs R16:$dst), (ins R16:$src),
@@ -849,10 +849,10 @@ let Constraints = "$dst = $src" in {
     []>;
 
   //  SRA A
-  //  RL B
+  //  RR B
   def ASR16 : Pseudo<(outs R16:$dst), (ins R16:$src),
     "ASR16\t$dst",
-    []>;
+    [(set i16:$dst, (GBZ80asr i16:$src))]>;
 
 }
 

@@ -49,6 +49,8 @@ private:
   MachineFunction *MF;
 
   MachineInstr *expandSimple16(MachineInstr &, unsigned LoOpc, unsigned HiOpc);
+  MachineInstr *expandShift16(MachineInstr &, unsigned Opc1, unsigned Subreg1,
+                              unsigned Opc2, unsigned Subreg2);
   MachineInstr *expandSelect(MachineInstr &);
   MachineInstr *expandPseudo(MachineInstr &);
   bool expandPseudos();
@@ -121,6 +123,51 @@ MachineInstr *GBZ80PostISel::expandSimple16(MachineInstr &MI, unsigned LoOpc,
       .addReg(Res16_1)
       .addReg(ResHi)
       .addImm(GB::sub_hi);
+
+  return I;
+}
+
+MachineInstr *GBZ80PostISel::expandShift16(MachineInstr &MI,
+    unsigned Opc1, unsigned Subreg1, unsigned Opc2, unsigned Subreg2) {
+  DebugLoc dl = MI.getDebugLoc();
+  unsigned Dst16 = MI.getOperand(0).getReg();
+  unsigned Src16 = MI.getOperand(1).getReg();
+
+  // Extract Src:Subreg1
+  unsigned SubSrc1 = MRI->createVirtualRegister(&GB::R8RegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), SubSrc1)
+    .addReg(Src16, 0, Subreg1);
+
+  // Extract Src:Subreg2
+  unsigned SubSrc2 = MRI->createVirtualRegister(&GB::R8RegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), SubSrc2)
+    .addReg(Src16, 0, Subreg2);
+
+  // Do the operation. Opc1 first.
+  unsigned Res1 = MRI->createVirtualRegister(&GB::R8RegClass);
+  auto &LoOp = BuildMI(*MI.getParent(), MI, dl, TII->get(Opc1), Res1)
+               .addReg(SubSrc1);
+
+  // Then Opc2.
+  unsigned Res2 = MRI->createVirtualRegister(&GB::R8RegClass);
+  auto &HiOp = BuildMI(*MI.getParent(), MI, dl, TII->get(Opc2), Res2)
+      .addReg(SubSrc2);
+
+  // Now combine them.
+  unsigned Res16_0 = MRI->createVirtualRegister(&GB::R16RegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::IMPLICIT_DEF), Res16_0);
+
+  unsigned Res16_1 = MRI->createVirtualRegister(&GB::R16RegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::INSERT_SUBREG), Res16_1)
+    .addReg(Res16_0)
+    .addReg(Res1)
+    .addImm(Subreg1);
+
+  MachineInstr *I =
+    BuildMI(*MI.getParent(), MI, dl, TII->get(GB::INSERT_SUBREG), Dst16)
+      .addReg(Res16_1)
+      .addReg(Res2)
+      .addImm(Subreg2);
 
   return I;
 }
@@ -226,6 +273,13 @@ MachineInstr *GBZ80PostISel::expandPseudo(MachineInstr &MI) {
     return expandSimple16(MI, GB::XOR8r, GB::XOR8r);
   case GB::XOR16i:
     return expandSimple16(MI, GB::XOR8i, GB::XOR8i);
+
+  case GB::SHL16:
+    return expandShift16(MI, GB::SLA_r, GB::sub_lo, GB::RL_r, GB::sub_hi);
+  case GB::LSR16:
+    return expandShift16(MI, GB::SRL_r, GB::sub_hi, GB::RR_r, GB::sub_lo);
+  case GB::ASR16:
+    return expandShift16(MI, GB::SRA_r, GB::sub_hi, GB::RR_r, GB::sub_lo);
 
   case GB::Select8_8:
   case GB::Select8_16:
