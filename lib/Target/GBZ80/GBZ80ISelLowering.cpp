@@ -1380,7 +1380,7 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
   // BB:
   // cpi N, 0
   // breq RemBB
-  BuildMI(BB, dl, TII.get(GB::CP_n)).addReg(ShiftAmtSrcReg).addImm(0);
+  BuildMI(BB, dl, TII.get(GB::CP8i)).addReg(ShiftAmtSrcReg).addImm(0);
   BuildMI(BB, dl, TII.get(GB::JR_cc_e)).addMBB(RemBB).addImm(GBCC::COND_Z);
 
   // LoopBB:

@@ -1046,7 +1046,7 @@ def DAA : I8<(outs R8:$dst), (ins R8:$src),
 
 let Defs = [RF, RA], Constraints = "$dst = $src" in
 def CPL8 : Pseudo<(outs R8:$dst), (ins R8:$src),
-  "CPL\t$dst",
+  "CPL8\t$dst",
   [(set i8:$dst, (not i8:$src))]>;
 
 // Restricted to:
