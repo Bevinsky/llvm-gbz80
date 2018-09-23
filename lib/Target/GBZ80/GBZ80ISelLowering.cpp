@@ -34,7 +34,7 @@ namespace llvm {
 GBZ80TargetLowering::GBZ80TargetLowering(GBZ80TargetMachine &tm)
     : TargetLowering(tm) {
   // Set up the register classes.
-  addRegisterClass(MVT::i8, &GB::R8_GPRRegClass);
+  addRegisterClass(MVT::i8, &GB::R8RegClass);
   addRegisterClass(MVT::i16, &GB::R16RegClass);
 
   // Compute derived properties from the register classes.
@@ -927,7 +927,7 @@ SDValue GBZ80TargetLowering::LowerFormalArguments(
       EVT RegVT = VA.getLocVT();
       const TargetRegisterClass *RC;
       if (RegVT == MVT::i8) {
-        RC = &GB::R8_GPRRegClass;
+        RC = &GB::R8RegClass;
       } else if (RegVT == MVT::i16) {
         RC = &GB::R16RegClass;
       } else {
@@ -1304,7 +1304,7 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
     llvm_unreachable("Invalid shift opcode!");
   case GB::IselLsl8:
     Opc = GB::SLA_r;
-    RC = &GB::R8_GPRRegClass;
+    RC = &GB::R8RegClass;
     break;
   case GB::IselLsl16:
     Opc = GB::SHL16;
@@ -1312,7 +1312,7 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
     break;
   case GB::IselAsr8:
     Opc = GB::SRA_r;
-    RC = &GB::R8_GPRRegClass;
+    RC = &GB::R8RegClass;
     break;
   case GB::IselAsr16:
     Opc = GB::ASR16;
@@ -1320,7 +1320,7 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
     break;
   case GB::IselLsr8:
     Opc = GB::SRL_r;
-    RC = &GB::R8_GPRRegClass;
+    RC = &GB::R8RegClass;
     break;
   case GB::IselLsr16:
     Opc = GB::LSR16;
@@ -1328,7 +1328,7 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
     break;
   case GB::IselRol8:
     Opc = GB::RLC_r;
-    RC = &GB::R8_GPRRegClass;
+    RC = &GB::R8RegClass;
     break;
   case GB::IselRol16:
     Opc = GB::ROL16;
@@ -1336,7 +1336,7 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
     break;
   case GB::IselRor8:
     Opc = GB::RRC_r;
-    RC = &GB::R8_GPRRegClass;
+    RC = &GB::R8RegClass;
     break;
   case GB::IselRor16:
     Opc = GB::ROR16;
@@ -1369,8 +1369,8 @@ MachineBasicBlock *GBZ80TargetLowering::insertShift(MachineInstr &MI,
   LoopBB->addSuccessor(RemBB);
   LoopBB->addSuccessor(LoopBB);
 
-  unsigned ShiftAmtReg = RI.createVirtualRegister(&GB::R8_GPRRegClass);
-  unsigned ShiftAmtReg2 = RI.createVirtualRegister(&GB::R8_GPRRegClass);
+  unsigned ShiftAmtReg = RI.createVirtualRegister(&GB::R8RegClass);
+  unsigned ShiftAmtReg2 = RI.createVirtualRegister(&GB::R8RegClass);
   unsigned ShiftReg = RI.createVirtualRegister(RC);
   unsigned ShiftReg2 = RI.createVirtualRegister(RC);
   unsigned ShiftAmtSrcReg = MI.getOperand(2).getReg();
