@@ -196,36 +196,36 @@ MachineInstr *GBZ80PostISel::expandPseudo(MachineInstr &MI) {
   switch (MI.getOpcode()) {
   default: break;
   case GB::ADD16r:
-    return expandSimple16(MI, GB::ADD_r, GB::ADC_r);
+    return expandSimple16(MI, GB::ADD8r, GB::ADC8r);
   case GB::ADD16i:
-    return expandSimple16(MI, GB::ADD_n, GB::ADC_n);
+    return expandSimple16(MI, GB::ADD8i, GB::ADC8i);
   case GB::ADC16r:
-    return expandSimple16(MI, GB::ADC_r, GB::ADC_r);
+    return expandSimple16(MI, GB::ADC8r, GB::ADC8r);
   case GB::ADC16i:
-    return expandSimple16(MI, GB::ADC_n, GB::ADC_n);
+    return expandSimple16(MI, GB::ADC8i, GB::ADC8i);
   case GB::SUB16r:
-    return expandSimple16(MI, GB::SUB_r, GB::SBC_r);
+    return expandSimple16(MI, GB::SUB8r, GB::SBC8r);
   case GB::SUB16i:
-    return expandSimple16(MI, GB::SUB_n, GB::SBC_n);
+    return expandSimple16(MI, GB::SUB8i, GB::SBC8i);
   case GB::SBC16r:
-    return expandSimple16(MI, GB::SBC_r, GB::SBC_r);
+    return expandSimple16(MI, GB::SBC8r, GB::SBC8r);
   case GB::SBC16i:
-    return expandSimple16(MI, GB::SBC_n, GB::SBC_n);
+    return expandSimple16(MI, GB::SBC8i, GB::SBC8i);
 
   case GB::AND16r:
-    return expandSimple16(MI, GB::AND_r, GB::AND_r);
+    return expandSimple16(MI, GB::AND8r, GB::AND8r);
   case GB::AND16i:
-    return expandSimple16(MI, GB::AND_n, GB::AND_n);
+    return expandSimple16(MI, GB::AND8i, GB::AND8i);
 
   case GB::OR16r:
-    return expandSimple16(MI, GB::OR_r, GB::OR_r);
+    return expandSimple16(MI, GB::OR8r, GB::OR8r);
   case GB::OR16i:
-    return expandSimple16(MI, GB::OR_n, GB::OR_n);
+    return expandSimple16(MI, GB::OR8i, GB::OR8i);
 
   case GB::XOR16r:
-    return expandSimple16(MI, GB::XOR_r, GB::XOR_r);
+    return expandSimple16(MI, GB::XOR8r, GB::XOR8r);
   case GB::XOR16i:
-    return expandSimple16(MI, GB::XOR_n, GB::XOR_n);
+    return expandSimple16(MI, GB::XOR8i, GB::XOR8i);
 
   case GB::Select8_8:
   case GB::Select8_16:
