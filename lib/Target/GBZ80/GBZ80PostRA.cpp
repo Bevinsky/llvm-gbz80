@@ -249,6 +249,33 @@ MachineInstr *GBZ80PostRA::expandPseudo(MachineInstr &MI) {
     return expand8BitArith(MI, GB::XOR_r);
   case GB::XOR8i:
     return expand8BitArith(MI, GB::XOR_n);
+
+  case GB::CP8r:
+  case GB::CP8i: {
+    // Handle CP separately as it's a special case (no def)
+    unsigned NewOpc = MI.getOpcode() == GB::CP8r ? GB::CP_r : GB::CP_n;
+    unsigned LHSReg = MI.getOperand(0).getReg();
+    unsigned RHSIsReg = MI.getOperand(1).isReg();
+    unsigned RHSReg = RHSIsReg ? MI.getOperand(1).getReg() : 0;
+    bool RHSIsKill = RHSIsReg ? MI.getOperand(1).isKill() : false;
+    int8_t RHSImm = !RHSIsReg ? MI.getOperand(1).getImm() : 0;
+
+    // Copy the LHS to A. It won't be A at this point.
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r), GB::RA)
+      .addReg(LHSReg);
+
+    // If the def is dead in the original instr, that means it's dead on
+    // this one. The RA use is kill.
+    auto &B = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(NewOpc))
+      .addReg(GB::RA, RegState::Kill);
+    if (RHSIsReg)
+      B.addReg(RHSReg, getKillRegState(RHSIsKill));
+    else
+      B.addImm(RHSImm);
+
+    return B;
+  }
+
   }
 
   return LastNew;
