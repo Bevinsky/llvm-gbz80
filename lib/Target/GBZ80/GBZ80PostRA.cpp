@@ -125,7 +125,7 @@ MachineInstr *GBZ80PostRA::expand8BitLDST(MachineInstr &MI) {
   if (isStore && OpValueReg != ValueReg)
     // Copy to A before storing.
     // FIXME: Flags? Liveranges?
-    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), OpValueReg)
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r), OpValueReg)
       .addReg(ValueReg);
 
   auto Builder = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(opcode));
@@ -144,14 +144,13 @@ MachineInstr *GBZ80PostRA::expand8BitLDST(MachineInstr &MI) {
   Builder.addReg(InPtrReg, getKillRegState(InPtrKill &&
                                            !(isPost && !isPostOpc &&
                                              !PostPtrDead)));
-  for (auto &MMO : MI.memoperands())
-    Builder.addMemOperand(MMO);
+  Builder.cloneMemRefs(MI);
   New = Builder;
 
   if (!isStore && OpValueReg != ValueReg) {
     // Copy from A after loading.
     // FIXME: does it matter if we do this before or after the postupdate below?
-    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), ValueReg)
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r), ValueReg)
       .addReg(OpValueReg, getKillRegState(true));
   }
 

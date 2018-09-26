@@ -231,8 +231,7 @@ bool GBZ80PreRA::combinePostIncMemAccs() {
         Builder.addReg(IncDef, RegState::Define)
         .addReg(MemMI.getOperand(0).getReg());
       Builder.addReg(PtrReg);
-      for (auto &MMO : MemMI.memoperands())
-        Builder.addMemOperand(MMO);
+      Builder.cloneMemRefs(MemMI);
 
       MemMI.eraseFromParent();
       IncMI->eraseFromBundle();
