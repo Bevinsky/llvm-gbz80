@@ -53,6 +53,7 @@ private:
   bool expandPostRAPseudos();
   MachineInstr *expandPseudo(MachineInstr &);
   MachineInstr *expand8BitLDST(MachineInstr &);
+  MachineInstr *expand8BitGlobalLDST(MachineInstr &);
   MachineInstr *expand8BitArith(MachineInstr &, unsigned NewOpc);
 };
 
@@ -167,6 +168,37 @@ MachineInstr *GBZ80PostRA::expand8BitLDST(MachineInstr &MI) {
   return New;
 }
 
+MachineInstr *GBZ80PostRA::expand8BitGlobalLDST(MachineInstr &MI) {
+  bool isStore = MI.mayStore();
+
+  unsigned ValueReg = MI.getOperand(0).getReg();
+  MachineOperand &Addr = MI.getOperand(1);
+
+  if (isStore)
+    // Copy to A before storing.
+    // FIXME: Flags? Liveranges?
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r), GB::RA)
+      .addReg(ValueReg);
+
+  unsigned opcode = isStore ? GB::LD_nn_A : GB::LD_A_nn;
+  auto Builder =
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(opcode))
+      .addReg(GB::RA, getDefRegState(!isStore));
+  if (Addr.isGlobal())
+    Builder.addGlobalAddress(Addr.getGlobal(), Addr.getOffset());
+  else if (Addr.isImm())
+    Builder.addImm(Addr.getImm());
+  Builder.cloneMemRefs(MI);
+
+  MachineInstr *New = Builder;
+  if (!isStore)
+    // Copy from A after loading.
+    New = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r),
+                  ValueReg)
+            .addReg(GB::RA, getKillRegState(true));
+  return New;
+}
+
 MachineInstr *GBZ80PostRA::expand8BitArith(MachineInstr &MI,
                                            unsigned NewOpc) {
   unsigned DstReg = MI.getOperand(0).getReg();
@@ -213,6 +245,10 @@ MachineInstr *GBZ80PostRA::expandPseudo(MachineInstr &MI) {
   case GB::LD8_DEC:
   case GB::ST8_DEC:
     return expand8BitLDST(MI);
+
+  case GB::LD8_nn:
+  case GB::ST8_nn:
+    return expand8BitGlobalLDST(MI);
 
   case GB::ADD8r:
     return expand8BitArith(MI, GB::ADD_r);

@@ -345,7 +345,7 @@ let mayLoad = 1 in {
 
   // Restricted to:
   //   LD A, [nn]
-  def LD_r_nn : I24<(outs R8:$src), (ins uimm16:$addr),
+  def LD_A_nn : I24<(outs R8:$src), (ins uimm16:$addr),
     "LD\t$src, [$addr]",
     []>;
 }
@@ -413,7 +413,7 @@ let mayStore = 1 in {
 
   // Restricted to:
   //   LD [nn], A
-  def LD_nn_r : I24<(outs), (ins R8:$src, uimm16:$addr),
+  def LD_nn_A : I24<(outs), (ins R8:$src, uimm16:$addr),
     "LD\t[$addr], $src",
     []>;
 }
@@ -1108,15 +1108,15 @@ def : Pat<(GBZ80call (i16 texternalsym:$dst)),
 
 // Store to global.
 def : Pat<(store i8:$src, (GBZ80Wrapper tglobaladdr:$addr)),
-          (ST8 $src, $addr)>;
+          (ST8_nn $src, $addr)>;
 def : Pat<(store i8:$src, (GBZ80Wrapper texternalsym:$addr)),
-          (ST8 $src, $addr)>;
+          (ST8_nn $src, $addr)>;
 
 // Load from global.
 def : Pat<(i8 (load (GBZ80Wrapper tglobaladdr:$addr))),
-          (LD8 $addr)>;
+          (LD8_nn $addr)>;
 def : Pat<(i8 (load (GBZ80Wrapper texternalsym:$addr))),
-          (LD8 $addr)>;
+          (LD8_nn $addr)>;
 
 // Inc/dec of i8 and i16.
 def : Pat<(add R8:$src, 1),  (INC_r $src)>;
