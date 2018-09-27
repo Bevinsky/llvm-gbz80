@@ -79,13 +79,13 @@ static unsigned getOpcodeforLDST(bool isStore, bool isPostInc, bool isPostDec,
       IsPostOpc = true;
       return isPostInc ? GB::LD_HLI_A : GB::LD_HLD_A;
     }
-    return GB::LD8_nn;
+    return GB::LD_dd_r;
   } else {
     if (PtrReg == GB::RHL && !PostPtrDead && (isPostInc || isPostDec)) {
       IsPostOpc = true;
       return isPostInc ? GB::LD_A_HLI : GB::LD_A_HLD;
     }
-    return GB::ST8_nn;
+    return GB::LD_r_dd;
   }
 }
 
