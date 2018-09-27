@@ -75,7 +75,7 @@ public:
   }
 
   bool addInstSelector() override;
-  void addPreSched2() override;
+  void addPostRegAlloc() override;
   void addPreEmitPass() override;
   void addPreRegAlloc() override;
 };
@@ -120,7 +120,7 @@ void GBZ80PassConfig::addPreRegAlloc() {
   addPass(createGBZ80PreRAPass());
 }
 
-void GBZ80PassConfig::addPreSched2() {
+void GBZ80PassConfig::addPostRegAlloc() {
   addPass(createGBZ80PostRAPass());
 }
 

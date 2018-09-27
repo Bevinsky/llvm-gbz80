@@ -126,7 +126,7 @@ MachineInstr *GBZ80PostRA::expand8BitLDST(MachineInstr &MI) {
   if (isStore && OpValueReg != ValueReg)
     // Copy to A before storing.
     // FIXME: Flags? Liveranges?
-    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r), OpValueReg)
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), OpValueReg)
       .addReg(ValueReg);
 
   auto Builder = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(opcode));
@@ -151,7 +151,7 @@ MachineInstr *GBZ80PostRA::expand8BitLDST(MachineInstr &MI) {
   if (!isStore && OpValueReg != ValueReg) {
     // Copy from A after loading.
     // FIXME: does it matter if we do this before or after the postupdate below?
-    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r), ValueReg)
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), ValueReg)
       .addReg(OpValueReg, getKillRegState(true));
   }
 
@@ -177,7 +177,7 @@ MachineInstr *GBZ80PostRA::expand8BitGlobalLDST(MachineInstr &MI) {
   if (isStore)
     // Copy to A before storing.
     // FIXME: Flags? Liveranges?
-    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r), GB::RA)
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), GB::RA)
       .addReg(ValueReg);
 
   unsigned opcode = isStore ? GB::LD_nn_A : GB::LD_A_nn;
@@ -193,7 +193,7 @@ MachineInstr *GBZ80PostRA::expand8BitGlobalLDST(MachineInstr &MI) {
   MachineInstr *New = Builder;
   if (!isStore)
     // Copy from A after loading.
-    New = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r),
+    New = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY),
                   ValueReg)
             .addReg(GB::RA, getKillRegState(true));
   return New;
@@ -210,7 +210,7 @@ MachineInstr *GBZ80PostRA::expand8BitArith(MachineInstr &MI,
 
   // Copy the LHS to A. It won't be A at this point.
   // XXX: Isn't this guaranteed to be kill because of the tie?
-  BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r), GB::RA)
+  BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), GB::RA)
     .addReg(DstReg);
 
   // If the def is dead in the original instr, that means it's dead on
@@ -227,7 +227,7 @@ MachineInstr *GBZ80PostRA::expand8BitArith(MachineInstr &MI,
   // If the dst isn't dead, copy it back to the real dst. The RA
   // use is kill.
   if (!DstIsDead)
-    New = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r))
+    New = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY))
       .addReg(DstReg, RegState::Define)
       .addReg(GB::RA, RegState::Kill);
 
@@ -296,7 +296,7 @@ MachineInstr *GBZ80PostRA::expandPseudo(MachineInstr &MI) {
     int8_t RHSImm = !RHSIsReg ? MI.getOperand(1).getImm() : 0;
 
     // Copy the LHS to A. It won't be A at this point.
-    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::LD_r_r), GB::RA)
+    BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), GB::RA)
       .addReg(LHSReg);
 
     // If the def is dead in the original instr, that means it's dead on
