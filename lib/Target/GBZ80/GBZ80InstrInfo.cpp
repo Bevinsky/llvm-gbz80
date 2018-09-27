@@ -546,10 +546,11 @@ unsigned GBZ80InstrInfo::insertBranch(MachineBasicBlock &MBB,
     GBCC::CondCodes CC = (GBCC::CondCodes)I->getImm();
     MachineBasicBlock *Dest = IsTrueBranch ? TBB : FBB;
     // If Dest is null, this means we must jump to the fallthrough.
-    if (!Dest)
+    if (!Dest) {
       Dest = MBB.getNextNode();
-    assert(std::next(MBB.getIterator()) != MBB.getParent()->end() &&
-           "Fallthrough at the end of a function?");
+      assert(std::next(MBB.getIterator()) != MBB.getParent()->end() &&
+            "Fallthrough at the end of a function?");
+    }
 
     auto &CondMI = *BuildMI(&MBB, DL, get(GB::JP_cc_nn))
       .addMBB(Dest)
