@@ -73,26 +73,21 @@ MachineInstr *GBZ80PostISel::expandSimple16(MachineInstr &MI, unsigned LoOpc,
   int8_t ImmHi = !RHSIsReg ? (int8_t)(MI.getOperand(2).getImm() >> 8) : 0;
 
   // Extract LHS:lo and LHS:hi
-  unsigned LHSLo = MRI->createVirtualRegister(&GB::R8_GPRRegClass);
-  unsigned LHSHi = MRI->createVirtualRegister(&GB::R8_GPRRegClass);
+  unsigned LHSLo = MRI->createVirtualRegister(&GB::R8RegClass);
+
   BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), LHSLo)
     .addReg(LHS16, 0, GB::sub_lo);
-  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), LHSHi)
-    .addReg(LHS16, 0, GB::sub_hi);
 
   // Extract RHS:lo and RHS:hi if necessary
-  unsigned RHSLo, RHSHi;
+  unsigned RHSLo;
   if (RHSIsReg) {
-    RHSLo = MRI->createVirtualRegister(&GB::R8_GPRRegClass);
-    RHSHi = MRI->createVirtualRegister(&GB::R8_GPRRegClass);
+    RHSLo = MRI->createVirtualRegister(&GB::R8RegClass);
     BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), RHSLo)
       .addReg(RHS16, 0, GB::sub_lo);
-    BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), RHSHi)
-      .addReg(RHS16, 0, GB::sub_hi);
   }
 
   // Do the operation. Lo first.
-  unsigned ResLo = MRI->createVirtualRegister(&GB::R8_GPRRegClass);
+  unsigned ResLo = MRI->createVirtualRegister(&GB::R8RegClass);
   auto &LoOp = BuildMI(*MI.getParent(), MI, dl, TII->get(LoOpc), ResLo)
                .addReg(LHSLo);
   if (RHSIsReg)
@@ -100,8 +95,19 @@ MachineInstr *GBZ80PostISel::expandSimple16(MachineInstr &MI, unsigned LoOpc,
   else
     LoOp.addImm(ImmLo);
 
+  unsigned LHSHi = MRI->createVirtualRegister(&GB::R8RegClass);
+  BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), LHSHi)
+    .addReg(LHS16, 0, GB::sub_hi);
+
+  unsigned RHSHi;
+  if (RHSIsReg) {
+    RHSHi = MRI->createVirtualRegister(&GB::R8RegClass);
+    BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), RHSHi)
+      .addReg(RHS16, 0, GB::sub_hi);
+  }
+
   // Then Hi.
-  unsigned ResHi = MRI->createVirtualRegister(&GB::R8_GPRRegClass);
+  unsigned ResHi = MRI->createVirtualRegister(&GB::R8RegClass);
   auto &HiOp = BuildMI(*MI.getParent(), MI, dl, TII->get(HiOpc), ResHi)
       .addReg(LHSHi);
   if (RHSIsReg)
@@ -594,12 +600,12 @@ bool GBZ80PostISel::expandBranch16() {
       JR .T
       */
 
-      unsigned loL = MRI->createVirtualRegister(&GB::R8_GPRRegClass);
+      unsigned loL = MRI->createVirtualRegister(&GB::R8RegClass);
       BuildMI(*MI->getParent(), MI, dl, TII->get(GB::COPY), loL)
         .addReg(BI.LHSReg, 0, GB::sub_lo);
 
       if (BI.isRHSReg()) {
-        unsigned loR = MRI->createVirtualRegister(&GB::R8_GPRRegClass);
+        unsigned loR = MRI->createVirtualRegister(&GB::R8RegClass);
         BuildMI(*MI->getParent(), MI, dl, TII->get(GB::COPY), loR)
           .addReg(BI.RHSReg, 0, GB::sub_lo);
         BuildMI(*MI->getParent(), MI, dl, TII->get(GB::CP8r))
@@ -641,12 +647,12 @@ bool GBZ80PostISel::expandBranch16() {
         }
       }
 
-      unsigned hiL = MRI->createVirtualRegister(&GB::R8_GPRRegClass);
+      unsigned hiL = MRI->createVirtualRegister(&GB::R8RegClass);
       BuildMI(MidBB, dl, TII->get(GB::COPY), hiL)
         .addReg(BI.LHSReg, 0, GB::sub_hi);
 
       if (BI.isRHSReg()) {
-        unsigned hiR = MRI->createVirtualRegister(&GB::R8_GPRRegClass);
+        unsigned hiR = MRI->createVirtualRegister(&GB::R8RegClass);
         BuildMI(MidBB, dl, TII->get(GB::COPY), hiR)
           .addReg(BI.RHSReg, 0, GB::sub_hi);
         BuildMI(MidBB, dl, TII->get(GB::CP8r))
