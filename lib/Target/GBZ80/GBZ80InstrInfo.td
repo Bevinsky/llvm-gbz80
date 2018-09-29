@@ -469,9 +469,9 @@ multiclass ALUOp<string Name, SDNode MatchOp, list<Register> ExtraUses = [],
   // 8-bit pseudos.
   let Uses = ExtraUses, Defs = [RF, RA], Constraints = "$dst = $src1" in {
     let isCommutable = IsComm in
-    def 8r : Pseudo<(outs R8:$dst), (ins R8:$src1, R8:$src2),
+    def 8r : Pseudo<(outs R8:$dst), (ins R8:$src1, R8_GPR:$src2),
       !strconcat(Name, "8r\t$dst, $src2"),
-      [(set R8:$dst, (MatchOp R8:$src1, R8:$src2))]>;
+      [(set R8:$dst, (MatchOp R8:$src1, R8_GPR:$src2))]>;
     def 8i : Pseudo<(outs R8:$dst), (ins R8:$src1, imm8:$imm),
       !strconcat(Name, "8i\t$dst, $imm"),
       [(set R8:$dst, (MatchOp R8:$src1, imm8:$imm))]>;
