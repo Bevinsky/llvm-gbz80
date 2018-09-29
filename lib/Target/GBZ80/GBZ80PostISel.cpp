@@ -403,7 +403,7 @@ bool GBZ80PostISel::expandShiftLoop16() {
       BuildMI(&*MBBI, dl, TII->get(GB::CP8i))
         .addReg(ShiftAmtSrcReg)
         .addImm(0);
-      BuildMI(&*MBBI, dl, TII->get(GB::JR_cc_e))
+      BuildMI(&*MBBI, dl, TII->get(GB::JP_cc_nn))
         .addMBB(RemBB)
         .addImm(GBCC::COND_Z);
 
@@ -426,7 +426,7 @@ bool GBZ80PostISel::expandShiftLoop16() {
         .addReg(ShiftReg);
       BuildMI(LoopBB, dl, TII->get(GB::DEC_r), ShiftAmtReg2)
           .addReg(ShiftAmtReg);
-      BuildMI(LoopBB, dl, TII->get(GB::JR_cc_e))
+      BuildMI(LoopBB, dl, TII->get(GB::JP_cc_nn))
         .addMBB(LoopBB)
         .addImm(GBCC::COND_NZ);
 
@@ -585,12 +585,12 @@ bool GBZ80PostISel::expandBranch16() {
       loA = COPY LHS:lo
         loR = EXTRACT_SUBREG RHS, lo
       CP loA, loR/loImm
-      JR_cc Z/NZ, .F
+      JP_cc Z/NZ, .F
       LD A, C
       hiA = COPY LHS:hi
         hiR = EXTRACT_SUBREG RHS, lo
       CP hiA, hiR/hiImm
-      JR_cc Z/NZ, .F
+      JP_cc Z/NZ, .F
       JR .T
       */
 
@@ -610,7 +610,7 @@ bool GBZ80PostISel::expandBranch16() {
           .addReg(loL)
           .addImm((uint8_t)BI.RHSImm);
       }
-      BuildMI(*MI->getParent(), MI, dl, TII->get(GB::JR_cc_e))
+      BuildMI(*MI->getParent(), MI, dl, TII->get(GB::JP_cc_nn))
         .addMBB(BI.CC == ISD::SETEQ ? BI.False : BI.True)
         .addImm(GBCC::COND_NZ);
       
@@ -618,7 +618,7 @@ bool GBZ80PostISel::expandBranch16() {
       MachineBasicBlock *MidBB = MF->CreateMachineBasicBlock();
       MF->insert(std::next(MI->getParent()->getIterator()), MidBB);
 
-      BuildMI(TopBB, dl, TII->get(GB::JR_e))
+      BuildMI(TopBB, dl, TII->get(GB::JP_nn))
         .addMBB(MidBB);
 
       MidBB->transferSuccessorsAndUpdatePHIs(TopBB);
@@ -657,11 +657,11 @@ bool GBZ80PostISel::expandBranch16() {
           .addReg(hiL)
           .addImm((uint8_t)(BI.RHSImm >> 8));
       }
-      BuildMI(MidBB, dl, TII->get(GB::JR_cc_e))
+      BuildMI(MidBB, dl, TII->get(GB::JP_cc_nn))
         .addMBB(BI.CC == ISD::SETEQ ? BI.False : BI.True)
         .addImm(GBCC::COND_NZ);
 
-      BuildMI(MidBB, dl, TII->get(GB::JR_e))
+      BuildMI(MidBB, dl, TII->get(GB::JP_nn))
         .addMBB(BI.CC == ISD::SETEQ ? BI.True : BI.False);
 
 
