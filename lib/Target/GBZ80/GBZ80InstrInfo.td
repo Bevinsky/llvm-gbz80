@@ -997,17 +997,17 @@ let Defs = [RF, RA] in {
 
 let isCall = 1 in {
   // FIXME: These defs will have to go if calling convs change.
-  let Uses = [SP, IME], Defs = [IME, RA, RF, RAF, RB, RC, RBC] in
+  let Uses = [SP, IME], Defs = [IME] in
   def CALL_nn : I24<(outs), (ins calltarget:$targ),
     "CALL\t$targ",
     [(GBZ80call imm:$targ)]>;
   
-  let Uses = [SP, IME, RF], Defs = [IME, RA, RF, RAF, RB, RC, RBC] in
+  let Uses = [SP, IME, RF], Defs = [IME] in
   def CALL_cc_nn : I24<(outs), (ins calltarget:$targ, condcode:$cc),
     "CALL\t$cc, $targ",
     []>;
 
-  let Uses = [SP, IME], Defs = [IME, RA, RF, RAF, RB, RC, RBC] in
+  let Uses = [SP, IME], Defs = [IME] in
   def RST_t : I8<(outs), (ins imm8:$t),
     "RST\t$t",
     []>;

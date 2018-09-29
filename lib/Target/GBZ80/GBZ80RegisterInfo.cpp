@@ -34,25 +34,22 @@ GBZ80RegisterInfo::GBZ80RegisterInfo() : GBZ80GenRegisterInfo(0) {}
 
 const uint16_t *
 GBZ80RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
-  return CSR_Normal_SaveList;
-#if 0
-  CallingConv::ID CC = MF->getFunction()->getCallingConv();
-
-  return ((CC == CallingConv::GBZ80_INTR || CC == CallingConv::GBZ80_SIGNAL)
-              ? CSR_Interrupts_SaveList
-              : CSR_Normal_SaveList);
-#endif
+  // TODO: Interrupt functions save all registers.
+  // TODO: The number of parameters for this should probably be stored
+  // in a MachineFunctionInfo instance or something.
+  if (MF->getFunction().getFunctionType()->getNumParams() <= 1)
+    return CSR_0_1_SaveList;
+  else
+    return CSR_2_SaveList;
 }
 
 const uint32_t *
 GBZ80RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
                                       CallingConv::ID CC) const {
-  return CSR_Normal_RegMask;
-#if 0
-  return ((CC == CallingConv::GBZ80_INTR || CC == CallingConv::GBZ80_SIGNAL)
-              ? CSR_Interrupts_RegMask
-              : CSR_Normal_RegMask);
-#endif
+  if (MF.getFunction().getFunctionType()->getNumParams() <= 1)
+    return CSR_0_1_RegMask;
+  else
+    return CSR_2_RegMask;
 }
 
 BitVector GBZ80RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
@@ -62,6 +59,9 @@ BitVector GBZ80RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
 
   //  Reserve the stack pointer.
   Reserved.set(GB::SP);
+
+  // Reserve the IME.
+  Reserved.set(GB::IME);
 
   return Reserved;
 }

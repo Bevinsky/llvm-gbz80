@@ -34,18 +34,13 @@ let Namespace = "GB" in
 }
 
 // 8-bit registers.
-let CostPerUse = 0 in
 def RA : GBZ80Reg<7,  "A">;
-let CostPerUse = 1 in {
-  def RB : GBZ80Reg<0,  "B">;
-  def RC : GBZ80Reg<1,  "C">;
-  def RD : GBZ80Reg<2,  "D">;
-  def RE : GBZ80Reg<3,  "E">;
-}
-let CostPerUse = 2 in {
-  def RH : GBZ80Reg<4,  "H">;
-  def RL : GBZ80Reg<5,  "L">;
-}
+def RB : GBZ80Reg<0,  "B">;
+def RC : GBZ80Reg<1,  "C">;
+def RD : GBZ80Reg<2,  "D">;
+def RE : GBZ80Reg<3,  "E">;
+def RH : GBZ80Reg<4,  "H">;
+def RL : GBZ80Reg<5,  "L">;
 
 // Flags.
 def RF : GBZ80Reg<6,  "F">;
@@ -54,10 +49,8 @@ def RF : GBZ80Reg<6,  "F">;
 let SubRegIndices = [sub_hi, sub_lo],
     CoveredBySubRegs = 1 in {
   def RHL : GBZ80Reg<2, "HL", [RH, RL]>;
-  let CostPerUse = 1 in {
-    def RBC : GBZ80Reg<0, "BC", [RB, RC]>;
-    def RDE : GBZ80Reg<1, "DE", [RD, RE]>;
-  }
+  def RBC : GBZ80Reg<0, "BC", [RB, RC]>;
+  def RDE : GBZ80Reg<1, "DE", [RD, RE]>;
   def RAF : GBZ80Reg<3, "AF", [RA, RF]>;
 }
 
@@ -72,16 +65,16 @@ def IME : GBZ80Reg<0, "IME">;
 //===----------------------------------------------------------------------===//
 
 def R8 : RegisterClass<"GB", [i8], 8,
-  (add RA, RB, RC, RD, RE, RH, RL)>;
+  (add RA, RL, RH, RE, RD, RC, RB)>;
 def R8_GPR : RegisterClass<"GB", [i8], 8,
-  (add RB, RC, RD, RE, RH, RL)>;
+  (add     RL, RH, RE, RD, RC, RB)>;
 
 def R16_BCDE : RegisterClass<"GB", [i16], 8,
-  (add RBC, RDE)>;
+  (add RDE, RBC)>;
 def R16_HL : RegisterClass<"GB", [i16], 8,
   (add RHL)>;
 def R16 : RegisterClass<"GB", [i16], 8,
-  (add RHL, RBC, RDE)>;
+  (add RHL, RDE, RBC)>;
 
 let isAllocatable = 0 in {
   def R16_All : RegisterClass<"GB", [i16], 8,

@@ -800,20 +800,13 @@ static void analyzeStandardArguments(TargetLowering::CallLoweringInfo *CLI,
                                      CallingConv::ID CallConv,
                                      SmallVectorImpl<CCValAssign> &ArgLocs,
                                      CCState &CCInfo, bool IsCall, bool IsVarArg) {
-  static const MCPhysReg RegList8[] =
-  { GB::RA, GB::RB, GB::RC, GB::RD, GB::RE, GB::RH, GB::RL };
-  static const MCPhysReg RegList16[] =
-  { GB::RBC, GB::RHL, GB::RDE };
-  if (IsVarArg) {
-    // Variadic functions do not need all the analisys below.
-    if (IsCall) {
-      CCInfo.AnalyzeCallOperands(*Outs, ArgCC_GBZ80_Vararg);
-    } else {
-      CCInfo.AnalyzeFormalArguments(*Ins, ArgCC_GBZ80_Vararg);
-    }
-    return;
-  }
+  CCAssignFn &CCFn = IsVarArg ? ArgCC_GBZ80_Vararg : ArgCC_GBZ80;
+  if (IsCall)
+    CCInfo.AnalyzeCallOperands(*Outs, CCFn);
+  else
+    CCInfo.AnalyzeFormalArguments(*Ins, CCFn);
 
+#if 0
   // Fill in the Args array which will contain original argument sizes.
   SmallVector<unsigned, 8> Args;
   if (IsCall) {
@@ -822,6 +815,7 @@ static void analyzeStandardArguments(TargetLowering::CallLoweringInfo *CLI,
     assert(F != nullptr && "function should not be null");
     parseFunctionArgs(F, TD, Args);
   }
+
 
   unsigned ValNo = 0;
   // Variadic functions always use the stack.
@@ -860,6 +854,7 @@ static void analyzeStandardArguments(TargetLowering::CallLoweringInfo *CLI,
     }
     pos += Size;
   }
+  #endif
 }
 
 static void analyzeBuiltinArguments(TargetLowering::CallLoweringInfo &CLI,
