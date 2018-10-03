@@ -62,6 +62,8 @@ GBZ80TargetLowering::GBZ80TargetLowering(GBZ80TargetMachine &tm)
 
   setTruncStoreAction(MVT::i16, MVT::i8, Expand);
 
+  setOperationAction(ISD::LOAD, MVT::i16, Custom);
+
   // sub (x, imm) gets canonicalized to add (x, -imm), so for illegal types
   // revert into a sub since we don't have an add with immediate instruction.
   setOperationAction(ISD::ADD, MVT::i32, Custom);
@@ -594,6 +596,46 @@ SDValue GBZ80TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
                       MachinePointerInfo(SV), 0);
 }
 
+SDValue GBZ80TargetLowering::LowerLOAD(SDValue Op, SelectionDAG &DAG) const {
+  EVT VT = Op.getValueType();
+  assert(VT == MVT::i16 && "LowerLOAD of invalid type?");
+  // We want to lower i16 = LOAD ptr to:
+  //  a, c2 = LOAD ptr, c1
+  //  ptr2 = ADD ptr, 1
+  //  b, c3 = LOAD ptr2, c2
+  //  i16 = PAIR a, b
+  // If we can find a candidate for ptr2, we don't need to emit the ADD
+  // ourselves.
+  // TODO: We can likely do a lot more here in regards to finding a good
+  // postupdate. Or updating one. Maybe combine does that for us?
+
+  LoadSDNode *N = cast<LoadSDNode>(Op.getNode());
+  SDValue Chain = Op.getOperand(0);
+  SDValue Ptr = Op.getOperand(1);
+  MachineMemOperand *MMO = N->getMemOperand();
+  SDLoc dl(Op);
+
+  SDValue Load1 = DAG.getLoad(MVT::i8, dl, Chain, Ptr, MMO);
+
+  SDNode *Add = nullptr;
+  for (SDNode *Use : Ptr->uses())
+    if (Use->getOpcode() == ISD::ADD && !Use->isPredecessorOf(Op.getNode()))
+      if (ConstantSDNode *RHS = dyn_cast<ConstantSDNode>(Use->getOperand(1)))
+        if (RHS->getZExtValue() == 1) {
+          Add = Use;
+          break;
+        }
+  if (!Add)
+    Add = DAG.getNode(ISD::ADD, dl, MVT::i16, Ptr,
+                      DAG.getConstant(1, dl, MVT::i16)).getNode();
+  SDValue Load2 = DAG.getLoad(MVT::i8, dl, SDValue(Load1.getNode(), 1),
+                              SDValue(Add, 0), MMO);
+  return DAG.getMergeValues({
+    getPair(Load1, Load2, DAG),
+    SDValue(Load2.getNode(), 1)
+    }, dl);
+}
+
 SDValue GBZ80TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
   default:
@@ -619,6 +661,8 @@ SDValue GBZ80TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const
   case ISD::SDIVREM:
   case ISD::UDIVREM:
     return LowerDivRem(Op, DAG);
+  case ISD::LOAD:
+    return LowerLOAD(Op, DAG);
   }
 
   return SDValue();
@@ -741,6 +785,13 @@ bool GBZ80TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
 bool GBZ80TargetLowering::isOffsetFoldingLegal(
     const GlobalAddressSDNode *GA) const {
   return true;
+}
+
+SDValue GBZ80TargetLowering::getPair(SDValue Lo, SDValue Hi,
+                                     SelectionDAG &DAG) const {
+  SDLoc dl;
+  return DAG.getTargetInsertSubreg(GB::sub_hi, dl, MVT::i16,
+    DAG.getNode(ISD::ANY_EXTEND, dl, MVT::i16, Lo), Hi);
 }
 
 //===----------------------------------------------------------------------===//
