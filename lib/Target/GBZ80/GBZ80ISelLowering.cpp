@@ -617,6 +617,8 @@ SDValue GBZ80TargetLowering::LowerLOAD(SDValue Op, SelectionDAG &DAG) const {
 
   SDValue Load1 = DAG.getLoad(MVT::i8, dl, Chain, Ptr, MMO);
 
+  // TODO: We need to get much smarter with this. This should also try to
+  // replace other users of an increment of our base.
   SDNode *Add = nullptr;
   for (SDNode *Use : Ptr->uses())
     if (Use->getOpcode() == ISD::ADD && !Use->isPredecessorOf(Op.getNode()))
@@ -741,21 +743,18 @@ bool GBZ80TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
   EVT VT;
   SDLoc DL(N);
   return false;
-  /*
+#if 0
   if (const LoadSDNode *LD = dyn_cast<LoadSDNode>(N)) {
     VT = LD->getMemoryVT();
     if (LD->getExtensionType() != ISD::NON_EXTLOAD)
       return false;
   } else if (const StoreSDNode *ST = dyn_cast<StoreSDNode>(N)) {
     VT = ST->getMemoryVT();
-    if (GB::isProgramMemoryAccess(ST)) {
-      return false;
-    }
   } else {
     return false;
   }
 
-  if (VT != MVT::i8 && VT != MVT::i16) {
+  if (VT != MVT::i8) {
     return false;
   }
 
@@ -767,19 +766,21 @@ bool GBZ80TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
     int RHSC = RHS->getSExtValue();
     if (Op->getOpcode() == ISD::SUB)
       RHSC = -RHSC;
-    if ((VT == MVT::i16 && RHSC != 2) || (VT == MVT::i8 && RHSC != 1)) {
-      return false;
+    if (RHSC == 1) {
+      Base = Op->getOperand(0);
+      Offset = DAG.getConstant(RHSC, DL, MVT::i16);
+      AM = ISD::POST_INC;
+      return true;
+    } else if (RHSC == -1) {
+      Base = Op->getOperand(0);
+      Offset = DAG.getConstant(RHSC, DL, MVT::i16);
+      AM = ISD::POST_DEC;
+      return true;
     }
-
-    Base = Op->getOperand(0);
-    Offset = DAG.getConstant(RHSC, DL, MVT::i8);
-    AM = ISD::POST_INC;
-
-    return true;
   }
 
   return false;
-  */
+#endif
 }
 
 bool GBZ80TargetLowering::isOffsetFoldingLegal(
