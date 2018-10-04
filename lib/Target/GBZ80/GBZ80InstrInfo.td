@@ -465,13 +465,13 @@ let Defs = [SP], Uses = [SP] in {
 ///   OP16r
 ///   OP16i
 multiclass ALUOp<string Name, SDNode MatchOp, list<Register> ExtraUses = [],
-                 bit IsComm = 0> {
+                 bit IsComm = 0, RegisterClass RHSClass = R8_GPR> {
   // 8-bit pseudos.
   let Uses = ExtraUses, Defs = [RF, RA], Constraints = "$dst = $src1" in {
     let isCommutable = IsComm in
-    def 8r : Pseudo<(outs R8:$dst), (ins R8:$src1, R8_GPR:$src2),
+    def 8r : Pseudo<(outs R8:$dst), (ins R8:$src1, RHSClass:$src2),
       !strconcat(Name, "8r\t$dst, $src2"),
-      [(set R8:$dst, (MatchOp R8:$src1, R8_GPR:$src2))]>;
+      [(set R8:$dst, (MatchOp R8:$src1, RHSClass:$src2))]>;
     def 8i : Pseudo<(outs R8:$dst), (ins R8:$src1, imm8:$imm),
       !strconcat(Name, "8i\t$dst, $imm"),
       [(set R8:$dst, (MatchOp R8:$src1, imm8:$imm))]>;
@@ -517,7 +517,7 @@ defm XOR : ALUOp<"XOR", xor,  [],   1>;
 // TODO: Make pseudos for cp when the format is decided.
 
 let Defs = [RF, RA] in {
-  def CP8r : Pseudo<(outs), (ins R8:$lhs, R8:$rhs),
+  def CP8r : Pseudo<(outs), (ins R8:$lhs, R8_GPR:$rhs),
     "CP8\t$lhs, $rhs",
     [(GBZ80cmp i8:$lhs, i8:$rhs)]>;
   def CP8i : Pseudo<(outs), (ins R8:$lhs, imm8:$imm),

@@ -69,6 +69,8 @@ MachineInstr *GBZ80PostISel::expandSimple16(MachineInstr &MI, unsigned LoOpc,
   unsigned LHS16 = MI.getOperand(1).getReg();
   bool RHSIsReg = MI.getOperand(2).isReg();
   unsigned RHS16 = RHSIsReg ? MI.getOperand(2).getReg() : 0;
+  const TargetRegisterClass *RHSClass = !RHSIsReg ? nullptr :
+    TII->getRegClass(TII->get(LoOpc), 2, TRI, *MI.getMF());
   int8_t ImmLo = !RHSIsReg ? (int8_t)MI.getOperand(2).getImm() : 0;
   int8_t ImmHi = !RHSIsReg ? (int8_t)(MI.getOperand(2).getImm() >> 8) : 0;
 
@@ -80,7 +82,7 @@ MachineInstr *GBZ80PostISel::expandSimple16(MachineInstr &MI, unsigned LoOpc,
   // Extract RHS:lo if necessary.
   unsigned RHSLo;
   if (RHSIsReg) {
-    RHSLo = MRI->createVirtualRegister(&GB::R8RegClass);
+    RHSLo = MRI->createVirtualRegister(RHSClass);
     BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), RHSLo)
       .addReg(RHS16, 0, GB::sub_lo);
   }
@@ -102,7 +104,7 @@ MachineInstr *GBZ80PostISel::expandSimple16(MachineInstr &MI, unsigned LoOpc,
   // Extract RHS:hi if necessary.
   unsigned RHSHi;
   if (RHSIsReg) {
-    RHSHi = MRI->createVirtualRegister(&GB::R8RegClass);
+    RHSHi = MRI->createVirtualRegister(RHSClass);
     BuildMI(*MI.getParent(), MI, dl, TII->get(GB::COPY), RHSHi)
       .addReg(RHS16, 0, GB::sub_hi);
   }
