@@ -533,9 +533,9 @@ SDValue GBZ80TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
   }
   else {
     assert(LHS.getValueType() == MVT::i16);
-    TargetCC = DAG.getConstant(CC, dl, MVT::i8, true);
-    return SDValue(DAG.getMachineNode((unsigned)GB::BR16, dl, MVT::Other,
-      {Chain, Dest, Op.getOperand(1), LHS, RHS}), 0);
+    TargetCC = DAG.getConstant(CC, dl, MVT::i8);
+    return DAG.getNode(GBISD::BR16, dl, MVT::Other,
+      {Chain, Dest, TargetCC, LHS, RHS});
   }
 }
 

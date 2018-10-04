@@ -948,10 +948,13 @@ let isBranch = 1, isTerminator = 1 in {
     []>;
 
   // Pseudo compare+jump for i16. Expand after isel.
-  def BR16 : Pseudo<(outs), (ins brtarget16:$targ, condcode:$cc, R16:$lhs, R16:$rhs),
+  def BR16 : Pseudo<(outs), (ins brtarget16:$targ, imm8:$cc, R16:$lhs, R16:$rhs),
     "BR16\t$targ, $lhs, $rhs",
-    [(GBZ80br16 bb:$targ, condcode:$cc, R16:$lhs, R16:$rhs)]>;
+    [(GBZ80br16 bb:$targ, imm8:$cc, R16:$lhs, R16:$rhs)]>;
 }
+
+def : Pat<(GBZ80br16 bb:$targ, imm8:$cc, R16:$lhs, imm16:$rhs),
+          (BR16 $targ, imm:$cc, $lhs, (LD_dd_nn imm:$rhs))>;
 
 ///===============================
 /// Select pseudos
