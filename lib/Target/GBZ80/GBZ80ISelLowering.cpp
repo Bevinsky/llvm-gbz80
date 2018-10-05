@@ -63,6 +63,10 @@ GBZ80TargetLowering::GBZ80TargetLowering(GBZ80TargetMachine &tm)
   setTruncStoreAction(MVT::i16, MVT::i8, Expand);
 
   setOperationAction(ISD::LOAD, MVT::i16, Custom);
+  setIndexedLoadAction(ISD::POST_INC, MVT::i8, Legal);
+  setIndexedLoadAction(ISD::POST_DEC, MVT::i8, Legal);
+  setIndexedStoreAction(ISD::POST_INC, MVT::i8, Legal);
+  setIndexedStoreAction(ISD::POST_DEC, MVT::i8, Legal);
 
   // sub (x, imm) gets canonicalized to add (x, -imm), so for illegal types
   // revert into a sub since we don't have an add with immediate instruction.
@@ -742,8 +746,7 @@ bool GBZ80TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
                                                    SelectionDAG &DAG) const {
   EVT VT;
   SDLoc DL(N);
-  return false;
-#if 0
+
   if (const LoadSDNode *LD = dyn_cast<LoadSDNode>(N)) {
     VT = LD->getMemoryVT();
     if (LD->getExtensionType() != ISD::NON_EXTLOAD)
@@ -762,6 +765,8 @@ bool GBZ80TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
     return false;
   }
 
+  // TODO: Are we allowed to try to optimize this by splitting larger
+  // constant adds?
   if (const ConstantSDNode *RHS = dyn_cast<ConstantSDNode>(Op->getOperand(1))) {
     int RHSC = RHS->getSExtValue();
     if (Op->getOpcode() == ISD::SUB)
@@ -778,9 +783,7 @@ bool GBZ80TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
       return true;
     }
   }
-
   return false;
-#endif
 }
 
 bool GBZ80TargetLowering::isOffsetFoldingLegal(

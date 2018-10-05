@@ -386,11 +386,11 @@ let mayStore = 1, Constraints = "$ptr = $post" in {
   let Defs = [RA] in {
     def ST8_INC : Pseudo<(outs R16:$post), (ins R8:$src, R16:$ptr),
       "ST8\t[$ptr+], $src",
-      []>;
+      [(set i16:$post, (post_store i8:$src, i16:$ptr, 1))]>;
 
     def ST8_DEC : Pseudo<(outs R16:$post), (ins R8:$src, R16:$ptr),
       "ST8\t[$ptr-], $src",
-      []>;
+      [(set i16:$post, (post_store i8:$src, i16:$ptr, -1))]>;
   }
 
   // Restricted to:
