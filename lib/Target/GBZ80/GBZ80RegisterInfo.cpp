@@ -131,26 +131,15 @@ void GBZ80RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
   int Offset = MFI.getObjectOffset(FrameIndex);
 
+  // TODO: Something about this seems fishy.
   // Add one to the offset because SP points to an empty slot.
   Offset += MFI.getStackSize() - TFI->getOffsetOfLocalArea() + 1;
-  // Fold incoming offset.
-  Offset += MI.getOperand(FIOperandNum + 1).getImm();
 
-  // Combine these.
-  if (MI.getOpcode() == GB::FRMIDX) {
-    // Materialize a frame index.
-    // TODO
-  }
-  else if (MI.getOpcode() == GB::FRMIDX_Load8) {
-    // Load an 8 bit value from this frame index.
-    // TODO
-  }
-  else if (MI.getOpcode() == GB::FRMIDX_Store8) {
-    // Load an 8 bit value from this frame index.
-    // TODO
-  }
+  // Don't fold the offset here. We'll do this later after PEI.
 
-
+  assert(MI.getOpcode() == GB::FRMIDX || MI.getOpcode() == GB::LD8_FI ||
+         MI.getOpcode() == GB::ST8_FI);
+  MI.getOperand(FIOperandNum).ChangeToImmediate(Offset);
 }
 
 unsigned GBZ80RegisterInfo::getFrameRegister(const MachineFunction &MF) const {

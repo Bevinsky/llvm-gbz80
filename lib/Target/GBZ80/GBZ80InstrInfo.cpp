@@ -78,7 +78,7 @@ unsigned GBZ80InstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                            int &FrameIndex) const {
   // TODO: add the 16-bit one too
   switch (MI.getOpcode()) {
-  case GB::FRMIDX_Load8:
+  case GB::LD8_FI:
   /*case GB::FRMIDX_Load16:*/ {
     if (MI.getOperand(1).isFI()) {
       // XXX: this might break if 'side effects' includes clobbering.
@@ -97,7 +97,7 @@ unsigned GBZ80InstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
 unsigned GBZ80InstrInfo::isStoreToStackSlot(const MachineInstr &MI,
                                           int &FrameIndex) const {
   switch (MI.getOpcode()) {
-  case GB::FRMIDX_Store8:
+  case GB::ST8_FI:
     /*case GB::FRMIDX_Load16:*/ {
     if (MI.getOperand(1).isFI()) {
       // XXX: this might break if 'side effects' includes clobbering.
@@ -138,7 +138,7 @@ void GBZ80InstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
 
   unsigned Opcode = 0;
   if (TRI->isTypeLegalForClass(*RC, MVT::i8)) {
-    Opcode = GB::FRMIDX_Store8;
+    Opcode = GB::ST8_FI;
   } else if (TRI->isTypeLegalForClass(*RC, MVT::i16)) {
     assert(false && "not implemented");
   } else {
@@ -171,7 +171,7 @@ void GBZ80InstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
 
   unsigned Opcode = 0;
   if (TRI->isTypeLegalForClass(*RC, MVT::i8)) {
-    Opcode = GB::FRMIDX_Load8;
+    Opcode = GB::LD8_FI;
   } else if (TRI->isTypeLegalForClass(*RC, MVT::i16)) {
     assert(false && "not implemented");
   } else {

@@ -47,6 +47,7 @@ GBZ80TargetLowering::GBZ80TargetLowering(GBZ80TargetMachine &tm)
 
   setOperationAction(ISD::GlobalAddress, MVT::i16, Custom);
   setOperationAction(ISD::BlockAddress, MVT::i16, Custom);
+  setOperationAction(ISD::FrameIndex, MVT::i16, Custom);
 
   setOperationAction(ISD::STACKSAVE, MVT::Other, Expand);
   setOperationAction(ISD::STACKRESTORE, MVT::Other, Expand);
@@ -247,6 +248,7 @@ const char *GBZ80TargetLowering::getTargetNodeName(unsigned Opcode) const {
     NODE(RETI_FLAG);
     NODE(CALL);
     NODE(WRAPPER);
+    NODE(FI);
     NODE(LSL);
     NODE(LSR);
     NODE(ROL);
@@ -410,6 +412,16 @@ SDValue GBZ80TargetLowering::LowerBlockAddress(SDValue Op,
   SDValue Result = DAG.getTargetBlockAddress(BA, getPointerTy(DL));
 
   return DAG.getNode(GBISD::WRAPPER, SDLoc(Op), getPointerTy(DL), Result);
+}
+
+SDValue GBZ80TargetLowering::LowerFrameIndex(SDValue Op,
+                                             SelectionDAG &DAG) const {
+  auto DL = DAG.getDataLayout();
+  int FI = cast<FrameIndexSDNode>(Op)->getIndex();
+
+  SDValue Result = DAG.getConstant((int64_t)FI, SDLoc(), MVT::i16);
+
+  return DAG.getNode(GBISD::FI, SDLoc(Op), getPointerTy(DL), Result);
 }
 
 /// IntCCToGBCC - Convert a DAG integer condition code to an GBZ80 CC.
@@ -656,6 +668,8 @@ SDValue GBZ80TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const
     return LowerGlobalAddress(Op, DAG);
   case ISD::BlockAddress:
     return LowerBlockAddress(Op, DAG);
+  case ISD::FrameIndex:
+    return LowerFrameIndex(Op, DAG);
   case ISD::BR_CC:
     return LowerBR_CC(Op, DAG);
   case ISD::SELECT_CC:

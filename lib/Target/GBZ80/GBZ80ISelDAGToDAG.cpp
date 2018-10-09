@@ -276,22 +276,6 @@ bool GBZ80DAGToDAGISel::SelectInlineAsmMemoryOperand(const SDValue &Op,
 }
 #endif
 
-
-template <> bool GBZ80DAGToDAGISel::select<ISD::FrameIndex>(SDNode *N) {
-  auto DL = CurDAG->getDataLayout();
-
-  // Convert the frameindex into a temp instruction that will hold the
-  // effective address of the final stack slot.
-  int FI = cast<FrameIndexSDNode>(N)->getIndex();
-  SDValue TFI =
-    CurDAG->getTargetFrameIndex(FI, getTargetLowering()->getPointerTy(DL));
-
-  CurDAG->SelectNodeTo(N, GB::FRMIDX,
-                       getTargetLowering()->getPointerTy(DL), TFI,
-                       CurDAG->getTargetConstant(0, SDLoc(N), MVT::i16));
-  return true;
-}
-
 template <> bool GBZ80DAGToDAGISel::select<ISD::STORE>(SDNode *N) {
   // TODO match stores and loads of frame locations
   return false;
@@ -497,7 +481,6 @@ bool GBZ80DAGToDAGISel::trySelect(SDNode *N) {
 
   switch (Opcode) {
   // Nodes we fully handle.
-  case ISD::FrameIndex: return select<ISD::FrameIndex>(N);
   case ISD::BRIND:      return select<ISD::BRIND>(N);
   case ISD::UMUL_LOHI:
   case ISD::SMUL_LOHI:  return selectMultiplication(N);

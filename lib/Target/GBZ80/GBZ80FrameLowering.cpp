@@ -62,7 +62,7 @@ void GBZ80FrameLowering::emitPrologue(MachineFunction &MF,
 
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   const GBZ80MachineFunctionInfo *AFI = MF.getInfo<GBZ80MachineFunctionInfo>();
-  unsigned FrameSize = MFI.getStackSize() - AFI->getCalleeSavedFrameSize();
+  int FrameSize = MFI.getStackSize() - AFI->getCalleeSavedFrameSize();
 
   // Skip the callee-saved push instructions.
   while (
