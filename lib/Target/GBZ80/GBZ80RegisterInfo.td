@@ -65,9 +65,9 @@ def IME : GBZ80Reg<0, "IME">;
 //===----------------------------------------------------------------------===//
 
 def R8 : RegisterClass<"GB", [i8], 8,
-  (add RA, RL, RH, RE, RD, RC, RB)>;
+  (add RA, RL, RE, RC, RH, RD, RB)>;
 def R8_GPR : RegisterClass<"GB", [i8], 8,
-  (add     RL, RH, RE, RD, RC, RB)>;
+  (add     RL, RE, RC, RH, RD, RB)>;
 
 def R16_BCDE : RegisterClass<"GB", [i16], 8,
   (add RDE, RBC)>;
