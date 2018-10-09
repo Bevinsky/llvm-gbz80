@@ -1086,10 +1086,12 @@ SDValue GBZ80TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                  dyn_cast<ExternalSymbolSDNode>(Callee)) {
     Callee = DAG.getTargetExternalSymbol(ES->getSymbol(),
                                          getPointerTy(DAG.getDataLayout()));
+  } else {
+    llvm_unreachable("Cannot handle indirect call!");
   }
 
-  analyzeArguments(&CLI, F, &DAG.getDataLayout(), &Outs, 0, CallConv, ArgLocs, CCInfo,
-                   true, isVarArg);
+  analyzeArguments(&CLI, F, &DAG.getDataLayout(), &Outs, 0, CallConv, ArgLocs,
+                   CCInfo, true, isVarArg);
 
   // Get a count of how many bytes are to be pushed on the stack.
   unsigned NumBytes = CCInfo.getNextStackOffset();
@@ -1138,35 +1140,31 @@ SDValue GBZ80TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
     }
   }
 
-  // Second, stack arguments have to walked in reverse order by inserting
-  // chained stores, this ensures their order is not changed by the scheduler
-  // and that the push instruction sequence generated is correct, otherwise they
-  // can be freely intermixed.
-
-  // FIXME: This should be pushes of 16-bit words. Unsure how this will actually work.
+  // Use a sequence of pushes to move the values to the stack in
+  // reverse order. These are chained.
+  // TODO: Is using pushes here really the most efficient? Is there a better
+  // way? If we spill here, there's a high chance that this will be
+  // very expensive.
+  unsigned OffsetC = CCInfo.getNextStackOffset();
   for (unsigned AI : reverse(StackLocs)) {
     CCValAssign &VA = ArgLocs[AI];
     SDValue Arg = OutVals[AI];
 
     assert(VA.isMemLoc());
 
-    // SP points to one stack slot further so add one to adjust it.
-    SDValue PtrOff = DAG.getNode(
-        ISD::ADD, DL, getPointerTy(DAG.getDataLayout()),
-        DAG.getRegister(GB::SP, getPointerTy(DAG.getDataLayout())),
-        DAG.getIntPtrConstant(VA.getLocMemOffset() + 1, DL));
-
-    Chain =
-        DAG.getStore(Chain, DL, Arg, PtrOff,
-                      MachinePointerInfo::getStack(MF, VA.getLocMemOffset()),
-                      0);
+    Chain = SDValue(DAG.getMachineNode(GB::PUSH, DL, MVT::Other, Arg, Chain), 0);
+    OffsetC -= 2;
+    assert(VA.getLocMemOffset() == OffsetC);
   }
 
   // Build a sequence of copy-to-reg nodes chained together with token chain and
   // flag operands which copy the outgoing args into registers.  The InFlag in
   // necessary since all emited instructions must be stuck together.
+
+  // We do this in reverse so that we hopefully copy HL/A last, since having
+  // either/both available is vital.
   SDValue InFlag;
-  for (auto Reg : RegsToPass) {
+  for (auto Reg : reverse(RegsToPass)) {
     Chain = DAG.getCopyToReg(Chain, DL, Reg.first, Reg.second, InFlag);
     InFlag = Chain.getValue(1);
   }
