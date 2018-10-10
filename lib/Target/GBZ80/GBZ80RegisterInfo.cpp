@@ -131,9 +131,8 @@ void GBZ80RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
   int Offset = MFI.getObjectOffset(FrameIndex);
 
-  // TODO: Something about this seems fishy.
-  // Add one to the offset because SP points to an empty slot.
-  Offset += MFI.getStackSize() - TFI->getOffsetOfLocalArea() + 1;
+  // No extra offset here since SP points to the top of the stack.
+  Offset += MFI.getStackSize() - TFI->getOffsetOfLocalArea();
 
   // Don't fold the offset here. We'll do this later after PEI.
 

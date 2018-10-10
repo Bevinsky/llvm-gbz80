@@ -639,7 +639,7 @@ def LD8_FI : Pseudo<(outs R8:$dst), (ins i16imm:$idx, i16imm:$offs),
   "LD8_FI\t$dst, $idx, $offs",
   []>;
 let Uses = [SP], Defs = [RF, RA], mayStore = 1, mayLoad = 1 in
-def ST8_FI : Pseudo<(outs), (ins i16imm:$idx, i16imm:$offs, R8:$src),
+def ST8_FI : Pseudo<(outs), (ins R8:$src, i16imm:$idx, i16imm:$offs),
   "ST8_FI\t$src, $idx, $offs",
   []>;
 
@@ -1125,12 +1125,12 @@ def : Pat<(i8 (load (GBZ80Wrapper texternalsym:$addr))),
           (LD8_nn $addr)>;
 
 // Frame indexes.
-def : Pat<(i16 (GBZ80FI (i16 imm:$idx))),
-          (FRMIDX imm:$idx, 0)>;
-def : Pat<(i8 (load (GBZ80FI (i16 imm:$idx)))),
-          (LD8_FI imm:$idx, 0)>;
-def : Pat<(store i8:$src, (GBZ80FI (i16 imm:$idx))),
-          (ST8_FI imm:$idx, 0, $src)>;
+def : Pat<(i16 (GBZ80FI (i16 tframeindex:$idx))),
+          (FRMIDX tframeindex:$idx, 0)>;
+def : Pat<(i8 (load (GBZ80FI (i16 tframeindex:$idx)))),
+          (LD8_FI tframeindex:$idx, 0)>;
+def : Pat<(store i8:$src, (GBZ80FI (i16 tframeindex:$idx))),
+          (ST8_FI $src, tframeindex:$idx, 0)>;
 
 // Inc/dec of i8 and i16.
 def : Pat<(add R8:$src, 1),  (INC_r $src)>;

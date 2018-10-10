@@ -418,9 +418,7 @@ SDValue GBZ80TargetLowering::LowerFrameIndex(SDValue Op,
                                              SelectionDAG &DAG) const {
   auto DL = DAG.getDataLayout();
   int FI = cast<FrameIndexSDNode>(Op)->getIndex();
-
-  SDValue Result = DAG.getConstant((int64_t)FI, SDLoc(), MVT::i16);
-
+  SDValue Result = DAG.getTargetFrameIndex(FI, MVT::i16);
   return DAG.getNode(GBISD::FI, SDLoc(Op), getPointerTy(DL), Result);
 }
 
