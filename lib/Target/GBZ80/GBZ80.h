@@ -28,11 +28,13 @@ FunctionPass *createGBZ80ISelDag(GBZ80TargetMachine &TM,
 FunctionPass *createGBZ80PostISelPass();
 FunctionPass *createGBZ80PreRAPass();
 FunctionPass *createGBZ80PostRAPass();
+FunctionPass *createGBZ80PostPEIPass();
 FunctionPass *createGBZ80PreEmitPass();
 
 void initializeGBZ80PostISelPass(PassRegistry&);
 void initializeGBZ80PreRAPass(PassRegistry&);
 void initializeGBZ80PostRAPass(PassRegistry&);
+void initializeGBZ80PostPEIPass(PassRegistry&);
 void initializeGBZ80PreEmitPass(PassRegistry&);
 
 /// Contains the GBZ80 backend.

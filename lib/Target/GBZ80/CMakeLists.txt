@@ -22,6 +22,7 @@ add_llvm_target(GBZ80CodeGen
   GBZ80PostISel.cpp
   GBZ80PreRA.cpp
   GBZ80PostRA.cpp
+  GBZ80PostPEI.cpp
   GBZ80PreEmit.cpp
   GBZ80RegisterInfo.cpp
   GBZ80Subtarget.cpp

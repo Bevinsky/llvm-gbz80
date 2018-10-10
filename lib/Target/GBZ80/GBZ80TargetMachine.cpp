@@ -78,6 +78,7 @@ public:
   void addPostRegAlloc() override;
   void addPreEmitPass() override;
   void addPreRegAlloc() override;
+  void addPreSched2() override;
 };
 } // namespace
 
@@ -93,6 +94,7 @@ extern "C" void LLVMInitializeGBZ80Target() {
   initializeGBZ80PostISelPass(PR);
   initializeGBZ80PreRAPass(PR);
   initializeGBZ80PostRAPass(PR);
+  initializeGBZ80PostPEIPass(PR);
   initializeGBZ80PreEmitPass(PR);
 }
 
@@ -122,6 +124,10 @@ void GBZ80PassConfig::addPreRegAlloc() {
 
 void GBZ80PassConfig::addPostRegAlloc() {
   addPass(createGBZ80PostRAPass());
+}
+
+void GBZ80PassConfig::addPreSched2() {
+  addPass(createGBZ80PostPEIPass());
 }
 
 void GBZ80PassConfig::addPreEmitPass() {
