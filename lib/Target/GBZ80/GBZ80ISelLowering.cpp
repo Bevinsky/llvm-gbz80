@@ -185,6 +185,8 @@ GBZ80TargetLowering::GBZ80TargetLowering(GBZ80TargetMachine &tm)
     // improvements in how we treat 16-bit "registers" to be feasible.
   }
 
+  setTargetDAGCombine(ISD::ADD);
+
   // Division rtlib functions (not supported)
   setLibcallName(RTLIB::SDIV_I8, nullptr);
   setLibcallName(RTLIB::SDIV_I16, nullptr);
@@ -419,7 +421,8 @@ SDValue GBZ80TargetLowering::LowerFrameIndex(SDValue Op,
   auto DL = DAG.getDataLayout();
   int FI = cast<FrameIndexSDNode>(Op)->getIndex();
   SDValue Result = DAG.getTargetFrameIndex(FI, MVT::i16);
-  return DAG.getNode(GBISD::FI, SDLoc(Op), getPointerTy(DL), Result);
+  SDValue Offset = DAG.getTargetConstant(0, SDLoc(Op), MVT::i16);
+  return DAG.getNode(GBISD::FI, SDLoc(Op), getPointerTy(DL), Result, Offset);
 }
 
 /// IntCCToGBCC - Convert a DAG integer condition code to an GBZ80 CC.
@@ -1256,6 +1259,55 @@ SDValue GBZ80TargetLowering::LowerCallResult(
 
   return Chain;
 }
+
+//===----------------------------------------------------------------------===//
+//               DAG Combine
+//===----------------------------------------------------------------------===//
+
+using DAGCombinerInfo = TargetLowering::DAGCombinerInfo;
+
+
+static SDValue PerformADDCombine(SDNode *N, DAGCombinerInfo &DCI) {
+
+  EVT VT = N->getValueType(0);
+  SDLoc dl(N);
+  // Try folding an offset into a GBZ80FI.
+  if (VT == MVT::i16 && N->getOperand(0)->getOpcode() == GBISD::FI &&
+    N->getOperand(0)->hasOneUse())
+    if (auto *C0 = dyn_cast<ConstantSDNode>(N->getOperand(1)))
+      return DCI.DAG.getNode(GBISD::FI, dl, MVT::i16,
+        N->getOperand(0)->getOperand(0),
+        DCI.DAG.getTargetConstant(*C0->getConstantIntValue(), dl, MVT::i16));
+
+  return SDValue();
+}
+
+/// This method will be invoked for all target nodes and for any
+/// target-independent nodes that the target has registered with invoke it
+/// for.
+///
+/// The semantics are as follows:
+/// Return Value:
+///   SDValue.Val == 0   - No change was made
+///   SDValue.Val == N   - N was replaced, is dead, and is already handled.
+///   otherwise          - N should be replaced by the returned Operand.
+///
+/// In addition, methods provided by DAGCombinerInfo may be used to perform
+/// more complex transformations.
+///
+SDValue GBZ80TargetLowering::PerformDAGCombine(
+    SDNode *N, DAGCombinerInfo &DCI) const {
+
+  switch (N->getOpcode()) {
+  default: break;
+  case ISD::ADD:
+    return PerformADDCombine(N, DCI);
+  }
+
+  return SDValue();
+}
+
+
 
 //===----------------------------------------------------------------------===//
 //               Return Value Calling Convention Implementation

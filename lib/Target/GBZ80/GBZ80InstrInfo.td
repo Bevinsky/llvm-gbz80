@@ -21,7 +21,7 @@ def SDT_GBZ80CallSeqStart : SDCallSeqStart<[SDTCisVT<0, i16>, SDTCisVT<1, i16>]>
 def SDT_GBZ80CallSeqEnd : SDCallSeqEnd<[SDTCisVT<0, i16>, SDTCisVT<1, i16>]>;
 def SDT_GBZ80Call : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
 def SDT_GBZ80Wrapper : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>, SDTCisPtrTy<0>]>;
-def SDT_GBZ80FI  : SDTypeProfile<1, 1, [SDTCisPtrTy<0>]>;
+def SDT_GBZ80FI  : SDTypeProfile<1, 2, [SDTCisPtrTy<0>, SDTCisVT<2, i16>]>;
 def SDT_GBZ80Brcond : SDTypeProfile<0, 2,
                                   [SDTCisVT<0, OtherVT>, SDTCisVT<1, i8>]>;
 def SDT_GBZ80Br16 : SDTypeProfile<0, 4,
@@ -1125,12 +1125,12 @@ def : Pat<(i8 (load (GBZ80Wrapper texternalsym:$addr))),
           (LD8_nn $addr)>;
 
 // Frame indexes.
-def : Pat<(i16 (GBZ80FI (i16 tframeindex:$idx))),
-          (FRMIDX tframeindex:$idx, 0)>;
-def : Pat<(i8 (load (GBZ80FI (i16 tframeindex:$idx)))),
-          (LD8_FI tframeindex:$idx, 0)>;
-def : Pat<(store i8:$src, (GBZ80FI (i16 tframeindex:$idx))),
-          (ST8_FI $src, tframeindex:$idx, 0)>;
+def : Pat<(i16 (GBZ80FI (i16 tframeindex:$idx), timm:$offs)),
+          (FRMIDX tframeindex:$idx, imm:$offs)>;
+def : Pat<(i8 (load (GBZ80FI (i16 tframeindex:$idx), timm:$offs))),
+          (LD8_FI tframeindex:$idx, imm:$offs)>;
+def : Pat<(store i8:$src, (GBZ80FI (i16 tframeindex:$idx), timm:$offs)),
+          (ST8_FI $src, tframeindex:$idx, imm:$offs)>;
 
 // Inc/dec of i8 and i16.
 def : Pat<(add R8:$src, 1),  (INC_r $src)>;

@@ -175,6 +175,8 @@ private:
                           const SDLoc &dl, SelectionDAG &DAG,
                           SmallVectorImpl<SDValue> &InVals) const;
 
+  SDValue PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const override;
+
   SDValue getPair(SDValue Lo, SDValue Hi, SelectionDAG &DAG) const;
 
 private:
