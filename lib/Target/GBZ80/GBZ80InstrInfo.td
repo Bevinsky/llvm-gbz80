@@ -1138,7 +1138,22 @@ def : Pat<(add R8:$src, -1), (DEC_r $src)>;
 def : Pat<(sub R8:$src, 1),  (DEC_r $src)>;
 
 def : Pat<(add R16:$src, 1),  (INC_ss $src)>;
+def : Pat<(add R16:$src, 2),
+          (INC_ss (INC_ss $src))>;
+def : Pat<(add R16:$src, 3),
+          (INC_ss (INC_ss (INC_ss $src)))>;
+def : Pat<(add R16:$src, 4),
+          (INC_ss (INC_ss (INC_ss (INC_ss $src))))>;
+
 def : Pat<(add R16:$src, -1), (DEC_ss $src)>;
+def : Pat<(add R16:$src, -2),
+          (DEC_ss (DEC_ss $src))>;
+def : Pat<(add R16:$src, -3),
+          (DEC_ss (DEC_ss (DEC_ss $src)))>;
+def : Pat<(add R16:$src, -4),
+          (DEC_ss (DEC_ss (DEC_ss (DEC_ss $src))))>;
+
+// XXX: Don't think this can happen.
 def : Pat<(sub R16:$src, 1),  (DEC_ss $src)>;
 
 // Simplification for negation.
