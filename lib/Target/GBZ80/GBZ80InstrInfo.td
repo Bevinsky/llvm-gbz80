@@ -468,7 +468,7 @@ let Defs = [SP], Uses = [SP] in {
 ///   OP16r
 ///   OP16i
 multiclass ALUOp<string Name, SDNode MatchOp, list<Register> ExtraUses = [],
-                 bit IsComm = 0, RegisterClass RHSClass = R8_GPR> {
+                 bit IsComm = 0, RegisterClass RHSClass = R8> {
   // 8-bit pseudos.
   let Uses = ExtraUses, Defs = [RF, RA], Constraints = "$dst = $src1" in {
     let isCommutable = IsComm in
@@ -511,8 +511,8 @@ multiclass ALUOp<string Name, SDNode MatchOp, list<Register> ExtraUses = [],
 
 defm ADD : ALUOp<"ADD", add,  [],   1>;
 defm ADC : ALUOp<"ADC", adde, [RF], 1>;
-defm SUB : ALUOp<"SUB", sub>;
-defm SBC : ALUOp<"SBC", sube, [RF]>;
+defm SUB : ALUOp<"SUB", sub,  [],   0, R8_GPR>;
+defm SBC : ALUOp<"SBC", sube, [RF], 0, R8_GPR>;
 defm AND : ALUOp<"AND", and,  [],   1>;
 defm OR  : ALUOp<"OR",  or,   [],   1>;
 defm XOR : ALUOp<"XOR", xor,  [],   1>;

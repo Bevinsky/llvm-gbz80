@@ -207,7 +207,7 @@ MachineInstr *GBZ80PostRA::expand8BitArith(MachineInstr &MI,
   unsigned RHSReg = RHSIsReg ? MI.getOperand(2).getReg() : 0;
   bool RHSIsKill = RHSIsReg ? MI.getOperand(2).isKill() : false;
   int8_t RHSImm = !RHSIsReg ? MI.getOperand(2).getImm() : 0;
-
+  assert(RHSReg != GB::RA);
   // Copy the LHS to A. It won't be A at this point.
   // XXX: Isn't this guaranteed to be kill because of the tie?
   BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), GB::RA)
@@ -299,8 +299,6 @@ MachineInstr *GBZ80PostRA::expandPseudo(MachineInstr &MI) {
     BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(GB::COPY), GB::RA)
       .addReg(LHSReg);
 
-    // If the def is dead in the original instr, that means it's dead on
-    // this one. The RA use is kill.
     auto &B = BuildMI(*MI.getParent(), MI, DebugLoc(), TII->get(NewOpc))
       .addReg(GB::RA, RegState::Kill);
     if (RHSIsReg)
