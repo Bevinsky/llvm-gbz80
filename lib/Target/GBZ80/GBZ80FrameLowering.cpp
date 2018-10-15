@@ -30,8 +30,13 @@
 
 namespace llvm {
 
+// Stack grows down
+// Alignment is 1 (no alignment)
+// Local Area Offset is -1 (SP points to the top of the stack, so the local
+// area is located one byte lower)
+// TransAlignment is 1
 GBZ80FrameLowering::GBZ80FrameLowering()
-    : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 1, 0, 1, false) {}
+    : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 1, -1, 1, false) {}
 
 bool GBZ80FrameLowering::canSimplifyCallFramePseudos(
     const MachineFunction &MF) const {
@@ -77,14 +82,19 @@ void GBZ80FrameLowering::emitPrologue(MachineFunction &MF,
     return;
   }
 
-  assert(FrameSize <= 127 && "Cannot handle frames larger than 127 bytes!");
-
-  // Reserve the necessary frame memory by doing SP + -Size
-  MachineInstr *MI = BuildMI(MBB, MBBI, DL, TII.get(GB::ADD_SP_e))
-                         .addImm(-FrameSize)
-                         .setMIFlag(MachineInstr::FrameSetup);
-  // The flag operand is dead.
-  MI->findRegisterDefOperand(GB::RF)->setIsDead();
+  // The below only works on GBZ80, and it could be more efficient if we are
+  // past the break-even point for this and the large stack adjustment form.
+  // TODO: Microoptimization on small stack sizes.
+  while (FrameSize != 0) {
+    int ToSubtract = std::min(128, FrameSize);
+    // Reserve the necessary frame memory by doing SP + -Size
+    MachineInstr *MI = BuildMI(MBB, MBBI, DL, TII.get(GB::ADD_SP_e))
+      .addImm(-ToSubtract)
+      .setMIFlag(MachineInstr::FrameSetup);
+    // The flag operand is dead.
+    MI->findRegisterDefOperand(GB::RF)->setIsDead();
+    FrameSize -= ToSubtract;
+  }
 }
 
 void GBZ80FrameLowering::emitEpilogue(MachineFunction &MF,
@@ -98,7 +108,7 @@ void GBZ80FrameLowering::emitEpilogue(MachineFunction &MF,
   DebugLoc DL = MBBI->getDebugLoc();
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   const GBZ80MachineFunctionInfo *AFI = MF.getInfo<GBZ80MachineFunctionInfo>();
-  unsigned FrameSize = MFI.getStackSize() - AFI->getCalleeSavedFrameSize();
+  int FrameSize = MFI.getStackSize() - AFI->getCalleeSavedFrameSize();
   const GBZ80Subtarget &STI = MF.getSubtarget<GBZ80Subtarget>();
   const GBZ80InstrInfo &TII = *STI.getInstrInfo();
 
@@ -120,12 +130,16 @@ void GBZ80FrameLowering::emitEpilogue(MachineFunction &MF,
   }
 
   // XXX: This sort of code does not work with conditional return.
-
-  // Restore the frame pointer by doing FP += <size>.
-  MachineInstr *MI = BuildMI(MBB, MBBI, DL, TII.get(GB::ADD_SP_e))
-                         .addImm(FrameSize);
-  // The flag operand is dead.
-  MI->findRegisterDefOperand(GB::RF)->setIsDead();
+  // TODO: Microoptimization on small stack sizes.
+  while (FrameSize != 0) {
+    int ToAdd = std::min(127, FrameSize);
+    // Restore the frame pointer by doing FP += <size>.
+    MachineInstr *MI = BuildMI(MBB, MBBI, DL, TII.get(GB::ADD_SP_e))
+      .addImm(ToAdd);
+    // The flag operand is dead.
+    MI->findRegisterDefOperand(GB::RF)->setIsDead();
+    FrameSize -= ToAdd;
+  }
 }
 
 // Our frame pointer is the stack pointer, so we do not have a frame pointer.
