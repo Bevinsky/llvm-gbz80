@@ -129,6 +129,7 @@ void GBZ80RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   const TargetFrameLowering *TFI = TM.getSubtargetImpl()->getFrameLowering();
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
+  // Offset is the offset from the stack pointer on function entry.
   int Offset = MFI.getObjectOffset(FrameIndex);
 
   // No extra offset here since SP points to the top of the stack.

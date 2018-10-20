@@ -57,6 +57,11 @@ public:
     unsigned DstSubReg,
     const TargetRegisterClass *NewRC,
     LiveIntervals &LIS) const override;
+
+  bool trackLivenessAfterRegAlloc(const MachineFunction &MF) const override {
+    return true;
+  }
+
   /// Splits a 16-bit `DREGS` register into the lo/hi register pair.
   /// \param Reg A 16-bit register to split.
   void splitReg(unsigned Reg, unsigned &LoReg, unsigned &HiReg) const;

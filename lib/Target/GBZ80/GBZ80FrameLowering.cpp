@@ -135,7 +135,8 @@ void GBZ80FrameLowering::emitEpilogue(MachineFunction &MF,
     int ToAdd = std::min(127, FrameSize);
     // Restore the frame pointer by doing FP += <size>.
     MachineInstr *MI = BuildMI(MBB, MBBI, DL, TII.get(GB::ADD_SP_e))
-      .addImm(ToAdd);
+      .addImm(ToAdd)
+      .setMIFlag(MachineInstr::FrameDestroy);
     // The flag operand is dead.
     MI->findRegisterDefOperand(GB::RF)->setIsDead();
     FrameSize -= ToAdd;
@@ -207,7 +208,8 @@ bool GBZ80FrameLowering::restoreCalleeSavedRegisters(
     assert(TRI->getRegSizeInBits(*TRI->getMinimalPhysRegClass(Reg)) == 16 &&
            "Invalid register size");
 
-    BuildMI(MBB, MI, DL, TII.get(GB::POP), Reg);
+    BuildMI(MBB, MI, DL, TII.get(GB::POP), Reg)
+      .setMIFlag(MachineInstr::FrameDestroy);
   }
 
   return true;
